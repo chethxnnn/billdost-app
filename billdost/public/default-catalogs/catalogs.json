@@ -1,0 +1,80 @@
+{
+  "kirana": [
+    { "name": "Tata Salt", "price": 24, "unit": "kg", "category": "Grocery" },
+    { "name": "Aashirvaad Atta", "price": 55, "unit": "kg", "category": "Grocery" },
+    { "name": "Fortune Sunflower Oil", "price": 180, "unit": "litre", "category": "Grocery" },
+    { "name": "Toor Dal", "price": 130, "unit": "kg", "category": "Pulses" },
+    { "name": "Basmati Rice", "price": 85, "unit": "kg", "category": "Grains" },
+    { "name": "Sugar", "price": 45, "unit": "kg", "category": "Grocery" },
+    { "name": "Amul Butter 100g", "price": 56, "unit": "piece", "category": "Dairy" },
+    { "name": "Taj Mahal Chai", "price": 280, "unit": "kg", "category": "Beverages" },
+    { "name": "Maggi Noodles", "price": 14, "unit": "piece", "category": "Instant Food" },
+    { "name": "Dettol Soap", "price": 45, "unit": "piece", "category": "Personal Care" },
+    { "name": "Surf Excel 1kg", "price": 120, "unit": "piece", "category": "Household" },
+    { "name": "Parle-G Biscuit", "price": 10, "unit": "piece", "category": "Snacks" }
+  ],
+  "dhaba": [
+    { "name": "Roti", "price": 10, "unit": "piece", "category": "Bread" },
+    { "name": "Butter Roti", "price": 15, "unit": "piece", "category": "Bread" },
+    { "name": "Naan", "price": 30, "unit": "piece", "category": "Bread" },
+    { "name": "Jeera Rice", "price": 80, "unit": "plate", "category": "Rice" },
+    { "name": "Dal Fry", "price": 120, "unit": "plate", "category": "Main Course" },
+    { "name": "Paneer Butter Masala", "price": 180, "unit": "plate", "category": "Main Course" },
+    { "name": "Chicken Curry", "price": 220, "unit": "plate", "category": "Main Course" },
+    { "name": "Egg Curry", "price": 100, "unit": "plate", "category": "Main Course" },
+    { "name": "Raita", "price": 40, "unit": "plate", "category": "Sides" },
+    { "name": "Chai", "price": 15, "unit": "piece", "category": "Beverages" },
+    { "name": "Cold Drink (600ml)", "price": 40, "unit": "piece", "category": "Beverages" },
+    { "name": "Water Bottle", "price": 20, "unit": "piece", "category": "Beverages" }
+  ],
+  "salon": [
+    { "name": "Haircut (Men)", "price": 150, "unit": "service", "category": "Hair" },
+    { "name": "Haircut (Women)", "price": 300, "unit": "service", "category": "Hair" },
+    { "name": "Shave / Trim", "price": 80, "unit": "service", "category": "Hair" },
+    { "name": "Hair Color", "price": 500, "unit": "service", "category": "Hair" },
+    { "name": "Facial (Basic)", "price": 400, "unit": "service", "category": "Skin" },
+    { "name": "Facial (Gold)", "price": 800, "unit": "service", "category": "Skin" },
+    { "name": "Threading", "price": 30, "unit": "service", "category": "Skin" },
+    { "name": "Waxing (Full Arms)", "price": 200, "unit": "service", "category": "Skin" },
+    { "name": "Manicure", "price": 250, "unit": "service", "category": "Nails" },
+    { "name": "Pedicure", "price": 300, "unit": "service", "category": "Nails" },
+    { "name": "Head Massage", "price": 150, "unit": "service", "category": "Massage" },
+    { "name": "Hair Spa", "price": 600, "unit": "service", "category": "Hair" }
+  ],
+  "repair": [
+    { "name": "Screen Replacement", "price": 1500, "unit": "service", "category": "Mobile" },
+    { "name": "Battery Replacement", "price": 600, "unit": "service", "category": "Mobile" },
+    { "name": "Charging Port Repair", "price": 400, "unit": "service", "category": "Mobile" },
+    { "name": "Software Update", "price": 200, "unit": "service", "category": "Mobile" },
+    { "name": "Back Glass Repair", "price": 800, "unit": "service", "category": "Mobile" },
+    { "name": "Water Damage Repair", "price": 1200, "unit": "service", "category": "Mobile" },
+    { "name": "Diagnosis Fee", "price": 100, "unit": "service", "category": "General" },
+    { "name": "Tempered Glass", "price": 150, "unit": "piece", "category": "Accessories" },
+    { "name": "Phone Case", "price": 200, "unit": "piece", "category": "Accessories" },
+    { "name": "Charger", "price": 250, "unit": "piece", "category": "Accessories" }
+  ],
+  "wholesale": [
+    { "name": "Product A (Carton)", "price": 500, "unit": "piece", "category": "General" },
+    { "name": "Product B (Box)", "price": 1000, "unit": "piece", "category": "General" },
+    { "name": "Freight Charges", "price": 200, "unit": "service", "category": "Logistics" },
+    { "name": "Packing Charges", "price": 50, "unit": "service", "category": "Logistics" },
+    { "name": "Loading/Unloading", "price": 100, "unit": "service", "category": "Logistics" }
+  ],
+  "medical": [
+    { "name": "Consultation Fee", "price": 200, "unit": "service", "category": "Consultation" },
+    { "name": "Dolo 650", "price": 30, "unit": "strip", "category": "Medicine" },
+    { "name": "Crocin", "price": 25, "unit": "strip", "category": "Medicine" },
+    { "name": "Azithromycin 500mg", "price": 80, "unit": "strip", "category": "Medicine" },
+    { "name": "Cough Syrup", "price": 90, "unit": "piece", "category": "Medicine" },
+    { "name": "ORS Packet", "price": 20, "unit": "piece", "category": "Medicine" },
+    { "name": "Bandage Roll", "price": 35, "unit": "piece", "category": "First Aid" },
+    { "name": "Cotton 100g", "price": 40, "unit": "piece", "category": "First Aid" },
+    { "name": "Face Mask (Box)", "price": 150, "unit": "piece", "category": "Safety" },
+    { "name": "Sanitizer 200ml", "price": 60, "unit": "piece", "category": "Safety" }
+  ],
+  "other": [
+    { "name": "Item 1", "price": 100, "unit": "piece", "category": "General" },
+    { "name": "Item 2", "price": 200, "unit": "piece", "category": "General" },
+    { "name": "Service Charge", "price": 50, "unit": "service", "category": "Service" }
+  ]
+}
