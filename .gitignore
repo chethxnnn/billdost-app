@@ -110,3 +110,6 @@ Thumbs.db
 
 # WWebJS specific
 .WWebJS
+.wwebjs_auth/
+.wwebjs_cache/
+*.docx

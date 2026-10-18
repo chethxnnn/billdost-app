@@ -2,7 +2,7 @@
 
 import { useRef, useImperativeHandle, forwardRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import html2canvas from 'html2canvas'
+import html2canvas from 'html2canvas-pro'
 import { jsPDF } from 'jspdf'
 import { useShop } from '@/components/shared/ShopContext'
 

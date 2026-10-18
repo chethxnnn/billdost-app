@@ -39,19 +39,31 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     const message = `Hello ${invoice.customer_name},\n\nAapka bill (No: ${invoice.invoice_number}) ₹${invoice.total} ka ready hai.\n\nRegards,\n${shop?.name || 'Apni Dukaan'}`
     
     // 1. Check if WhatsApp Microservice is connected for this shop
+    const targetShopId = shop?.id || (invoice as any).shop_id
+    const waUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3001'
     try {
-      const statusRes = await fetch(`http://localhost:3001/api/whatsapp/${shop?.id}/status`)
-      const statusData = await statusRes.json()
+      if (targetShopId) {
+        const statusRes = await fetch(`${waUrl}/api/whatsapp/${targetShopId}/status`)
+        const statusData = await statusRes.json()
 
-      if (statusData.status === 'READY' && previewRef.current) {
-        toast.loading("Sending automated WhatsApp message...", { id: 'wa-send' })
-        
-        // Generate PDF
-        const pdfBase64 = await previewRef.current.getPDFBase64()
-        
-        if (pdfBase64) {
+        if (statusData.status === 'READY') {
+          if (!previewRef.current) {
+            toast.error("Invoice preview loading, please try again in a moment.")
+            return
+          }
+
+          toast.loading("Sending automated WhatsApp message with PDF bill...", { id: 'wa-send' })
+          
+          // Generate PDF
+          const pdfBase64 = await previewRef.current.getPDFBase64()
+          
+          if (!pdfBase64) {
+            toast.error("Failed to generate invoice PDF", { id: 'wa-send' })
+            return
+          }
+
           // Send via microservice
-          const sendRes = await fetch(`http://localhost:3001/api/whatsapp/${shop?.id}/send`, {
+          const sendRes = await fetch(`${waUrl}/api/whatsapp/${targetShopId}/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -62,16 +74,22 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             })
           })
 
-          if (sendRes.ok) {
-            toast.success("WhatsApp message sent successfully!", { id: 'wa-send' })
-            return // Done! No redirect.
+          const sendData = await sendRes.json()
+
+          if (sendRes.ok && sendData.success) {
+            toast.success("WhatsApp message sent directly to customer!", { id: 'wa-send' })
+            return // Direct send complete — NO tab redirection!
           } else {
-            throw new Error('Send failed')
+            toast.error(sendData.error || "Failed to send WhatsApp message", { id: 'wa-send' })
+            return
           }
+        } else {
+          console.warn("WhatsApp status is not READY:", statusData.status)
+          toast.warning("WhatsApp device is not linked yet! Please link in Settings > WhatsApp to send directly in the background.", { duration: 5000 })
         }
       }
     } catch (err) {
-      console.log("Microservice not available or failed, falling back to manual share.")
+      console.error("Microservice error:", err)
       toast.dismiss('wa-send')
     }
 
@@ -83,8 +101,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       if (shared) return // Native share succeeded, no need for wa.me fallback
     }
 
-    // 3. Ultimate Fallback (Desktop WA Web without microservice)
-    toast.success("Opening WhatsApp Web...")
+    // 3. Ultimate Fallback (Desktop WA Web when microservice is not connected)
+    toast.info("WhatsApp microservice not connected. Opening WhatsApp Web...")
     const url = `https://wa.me/91${invoice.customer_phone}?text=${encodeURIComponent(message)}`
     window.open(url, '_blank')
   }

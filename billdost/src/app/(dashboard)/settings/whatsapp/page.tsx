@@ -8,8 +8,7 @@ import { CheckCircle2, QrCode, RefreshCw, Smartphone, LogOut } from 'lucide-reac
 import { toast } from 'sonner'
 import Image from 'next/image'
 
-// In a real app, this should be an environment variable.
-const WHATSAPP_SERVICE_URL = 'http://localhost:3001'
+const WHATSAPP_SERVICE_URL = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3001'
 
 export default function WhatsAppSettingsPage() {
   const { shopId } = useShop()

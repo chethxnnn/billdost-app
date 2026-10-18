@@ -333,7 +333,7 @@ export const invoicesRouter = router({
       // Get shop details for the PDF
       const { data: shopDetails } = await supabase
         .from('shops')
-        .select('name, address, phone, gstin, upi_id')
+        .select('id, name, address, phone, gstin, upi_id')
         .eq('id', shop.id)
         .single()
 
