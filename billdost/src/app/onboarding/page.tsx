@@ -122,17 +122,24 @@ function OnboardingWizard() {
         language: (['hinglish', 'en', 'hi', 'kn'].includes(data.language)
           ? data.language
           : 'hinglish') as 'hinglish' | 'en' | 'hi' | 'kn',
-        products: data.products.map((p) => ({
-          name: p.name,
-          price: p.price,
-          unit: p.unit,
-          category: p.category || null,
-        })),
-        staff: data.staffMembers.map((s) => ({
-          name: s.name,
-          phone: s.phone,
-          role: s.role,
-        })),
+        // Blank placeholder rows (the wizard adds an empty row when a
+        // section is opened) are dropped, never submitted: an untouched
+        // optional row must not fail the whole onboarding.
+        products: data.products
+          .filter((p) => p.name.trim() !== '')
+          .map((p) => ({
+            name: p.name,
+            price: p.price,
+            unit: p.unit,
+            category: p.category || null,
+          })),
+        staff: data.staffMembers
+          .filter((s) => s.name.trim() !== '' || s.phone.trim() !== '')
+          .map((s) => ({
+            name: s.name,
+            phone: s.phone,
+            role: s.role,
+          })),
       })
 
       router.push('/dashboard')

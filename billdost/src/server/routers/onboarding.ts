@@ -48,10 +48,15 @@ export const onboardingRouter = router({
         logo_url: z.string().max(600).optional().nullable(),
         include_upi_qr: z.boolean().default(true),
         language: z.enum(['hinglish', 'en', 'hi', 'kn']).default('hinglish'),
+        // Element names allow empty strings on purpose: the wizard
+        // submits untouched placeholder rows, and one blank optional
+        // row must not fail the whole onboarding. The mutation below
+        // drops fully blank rows and rejects half-filled staff rows
+        // with a friendly message.
         products: z
           .array(
             z.object({
-              name: z.string().trim().min(1).max(120),
+              name: z.string().trim().max(120),
               price: z.number().min(0),
               unit: z.string().trim().max(20).default('piece'),
               category: z.string().trim().max(60).optional().nullable(),
@@ -62,7 +67,7 @@ export const onboardingRouter = router({
         staff: z
           .array(
             z.object({
-              name: z.string().trim().min(1).max(80),
+              name: z.string().trim().max(80),
               phone: phoneSchema,
               role: z.string().trim().max(20).default('cashier'),
             })
@@ -85,6 +90,18 @@ export const onboardingRouter = router({
         '-' +
         Date.now().toString(36)
 
+      // Drop fully blank placeholder rows; a staff row with a phone
+      // but no name is a real mistake, so it gets a clear message
+      // instead of a silent insert or a raw schema error.
+      const products = input.products.filter((p) => p.name !== '')
+      const staff = input.staff.filter((s) => s.name !== '' || s.phone !== '')
+      if (staff.some((s) => s.name === '')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Staff ka naam zaroori hai. Naam likho ya woh row hata do.',
+        })
+      }
+
       const payload = {
         shop_name: input.shop_name,
         slug,
@@ -95,8 +112,8 @@ export const onboardingRouter = router({
         logo_url: input.logo_url || null,
         include_upi_qr: input.include_upi_qr,
         language: input.language,
-        products: input.products,
-        staff: input.staff,
+        products,
+        staff,
       }
 
       const { data, error } = await supabase.rpc('complete_onboarding_tx', {
