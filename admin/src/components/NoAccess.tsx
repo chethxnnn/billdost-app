@@ -19,7 +19,7 @@ export default function NoAccess({ email }: { email: string }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12">
+    <div className="min-h-dvh flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-[420px] bg-white dark:bg-[#1C1C1E] border border-black/[0.06] dark:border-white/[0.08] rounded-[24px] p-8 text-center page-enter">
         <h1 className="text-[22px] font-extrabold tracking-tight mb-2">
           This area is for the BillDost team

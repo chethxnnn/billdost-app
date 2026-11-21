@@ -31,6 +31,25 @@ export interface TimelineEntry {
   created_at: string
 }
 
+/** Day bucket for the timeline's sticky date headers. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(now.getDate() - 1)
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  if (sameDay(d, now)) return 'Today'
+  if (sameDay(d, yesterday)) return 'Yesterday'
+  return d.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 /**
  * The Team screen (real data, Nov 22): the directory with presence
  * and what each person is doing right now, today's counts from the
@@ -51,6 +70,16 @@ export default function TeamBoard({
   const [filter, setFilter] = useState<string>('all')
   const visibleTimeline =
     filter === 'all' ? timeline : timeline.filter((e) => e.adminId === filter)
+
+  // Entries arrive newest first; bucket consecutive entries by day
+  // so each day gets a sticky header over its own card.
+  const timelineGroups: { label: string; entries: TimelineEntry[] }[] = []
+  for (const e of visibleTimeline) {
+    const label = dayLabel(e.created_at)
+    const last = timelineGroups[timelineGroups.length - 1]
+    if (last && last.label === label) last.entries.push(e)
+    else timelineGroups.push({ label, entries: [e] })
+  }
 
   return (
     <div className="space-y-4">
@@ -145,8 +174,8 @@ export default function TeamBoard({
         </ul>
       </Card>
 
-      <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center gap-3 px-4 md:px-5 py-4 border-b border-black/[0.05] dark:border-white/[0.07]">
+      <div>
+        <div className="flex flex-wrap items-center gap-3 px-1 mb-3">
           <h2 className="text-[16px] font-bold flex-1">Activity timeline</h2>
           <select
             value={filter}
@@ -163,40 +192,54 @@ export default function TeamBoard({
           </select>
         </div>
         {visibleTimeline.length === 0 ? (
-          <p className="px-5 py-8 text-[14px] text-[#5A5A5E] dark:text-[#A1A1A6] font-medium">
-            No activity recorded yet for this view.
-          </p>
+          <Card className="p-5">
+            <p className="text-[14px] text-[#5A5A5E] dark:text-[#A1A1A6] font-medium">
+              No activity recorded yet for this view.
+            </p>
+          </Card>
         ) : (
-          <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.07]">
-            {visibleTimeline.map((e) => (
-              <li key={e.id} className="px-4 md:px-5 py-3 flex items-start gap-3">
-                <Avatar name={e.who} size={32} />
-                <div className="flex-1 min-w-0 text-[14px] font-medium leading-relaxed">
-                  <span className="font-bold">{e.who}</span> {describeAction(e.action)}{' '}
-                  {e.shopName ? (
-                    e.shopId ? (
-                      <Link
-                        href={`/shops/${e.shopId}`}
-                        className="font-semibold text-[#1B7A4A] dark:text-[#25D366] hover:underline underline-offset-4"
-                      >
-                        {e.shopName}
-                      </Link>
-                    ) : (
-                      <span className="font-semibold">{e.shopName}</span>
-                    )
-                  ) : null}
-                  {e.reason ? (
-                    <span className="text-[#5A5A5E] dark:text-[#A1A1A6]"> · {e.reason}</span>
-                  ) : null}
-                  <span className="block text-[12px] text-[#86868B] mt-0.5">
-                    {formatDateTime(e.created_at)}
-                  </span>
-                </div>
-              </li>
+          <div className="space-y-5">
+            {timelineGroups.map((g) => (
+              <section key={g.label}>
+                <p className="sticky-group-head text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-2 py-1.5 -mx-1 rounded-[8px]">
+                  {g.label}{' '}
+                  <span className="text-[#86868B] tabular-nums">{g.entries.length}</span>
+                </p>
+                <Card className="overflow-hidden">
+                  <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.07]">
+                    {g.entries.map((e) => (
+                      <li key={e.id} className="px-4 md:px-5 py-3 flex items-start gap-3">
+                        <Avatar name={e.who} size={32} />
+                        <div className="flex-1 min-w-0 text-[14px] font-medium leading-relaxed">
+                          <span className="font-bold">{e.who}</span> {describeAction(e.action)}{' '}
+                          {e.shopName ? (
+                            e.shopId ? (
+                              <Link
+                                href={`/shops/${e.shopId}`}
+                                className="font-semibold text-[#1B7A4A] dark:text-[#25D366] hover:underline underline-offset-4"
+                              >
+                                {e.shopName}
+                              </Link>
+                            ) : (
+                              <span className="font-semibold">{e.shopName}</span>
+                            )
+                          ) : null}
+                          {e.reason ? (
+                            <span className="text-[#5A5A5E] dark:text-[#A1A1A6]"> · {e.reason}</span>
+                          ) : null}
+                          <span className="block text-[12px] text-[#86868B] mt-0.5">
+                            {formatDateTime(e.created_at)}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              </section>
             ))}
-          </ul>
+          </div>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

@@ -94,7 +94,7 @@ export default function QuickFinder() {
 
       {open ? (
         <div
-          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] fade-in flex items-start justify-center p-4 pt-[10vh]"
+          className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-[2px] fade-in flex items-start justify-center p-4 pt-[10vh]"
           onClick={() => setOpen(false)}
         >
           <div

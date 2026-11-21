@@ -151,7 +151,7 @@ export default function Shell({
   const moreItems = MORE.filter((i) => visible(i, admin.role))
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       {/* Frosted header */}
       <header className="sticky top-0 z-40 bg-[#F5F5F7]/80 dark:bg-black/70 backdrop-blur-[16px] border-b border-black/[0.05] dark:border-white/[0.07]">
         <div className="max-w-[1120px] mx-auto flex items-center gap-2 px-4 md:px-6 h-[60px]">
@@ -224,16 +224,22 @@ export default function Shell({
         </div>
       </header>
 
-      {/* Canvas */}
-      <main className="w-full max-w-[1120px] mx-auto px-4 md:px-6 pt-6 md:pt-8 pb-[150px] md:pb-[168px]">
+      {/* Canvas. Bottom padding clears the dock at every width,
+          including the phone safe area, so the last card's actions
+          are always reachable above it. */}
+      <main className="w-full max-w-[1120px] mx-auto px-4 md:px-6 pt-6 md:pt-8 pb-[calc(150px+env(safe-area-inset-bottom,0px))] md:pb-[calc(168px+env(safe-area-inset-bottom,0px))]">
         <div className="page-enter" key={pathname}>
           {children}
         </div>
       </main>
 
-      {/* Floating dock */}
+      {/* Floating dock. Centred by left-1/2 + the translate utility
+          alone (the entrance animation moves only Y, see globals).
+          On phones the dock takes the full safe width and its items
+          share it evenly with flex-1, so nothing can spill off the
+          screen edges; the bottom offset includes the safe area. */}
       <nav
-        className="dock-in fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white/75 dark:bg-[#2C2C2E]/80 backdrop-blur-[18px] border border-black/[0.06] dark:border-white/10 shadow-xl shadow-black/[0.08] rounded-full p-1.5 flex items-center gap-1 max-w-[calc(100vw-16px)]"
+        className="dock-in fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] md:bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-40 bg-white/75 dark:bg-[#2C2C2E]/80 backdrop-blur-[18px] border border-black/[0.06] dark:border-white/10 shadow-xl shadow-black/[0.08] rounded-full p-1.5 flex items-center gap-1 w-[calc(100vw-1rem)] sm:w-auto sm:max-w-[calc(100vw-2rem)]"
         aria-label="Portal"
       >
         {dockItems.map((item) => {
@@ -242,24 +248,24 @@ export default function Shell({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-[11px] sm:text-[13px] font-bold transition-all duration-200 active:scale-[0.95] ${
+              className={`flex flex-1 sm:flex-none min-w-0 flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 px-1 min-[420px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[420px]:text-[11px] sm:text-[13px] font-bold transition-all duration-200 active:scale-[0.95] ${
                 active
                   ? 'bg-[#1B7A4A] text-white dark:bg-[#25D366] dark:text-black shadow-sm'
                   : 'text-[#3A3A3C] dark:text-[#D1D1D6] hover:bg-black/[0.05] dark:hover:bg-white/[0.08]'
               }`}
             >
-              <item.icon className="w-5 h-5 sm:w-[18px] sm:h-[18px]" />
-              {item.label}
+              <item.icon className="w-5 h-5 sm:w-[18px] sm:h-[18px] shrink-0" />
+              <span className="truncate">{item.label}</span>
             </Link>
           )
         })}
         {moreItems.length > 0 ? (
           <button
             onClick={() => setMoreOpen(true)}
-            className="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-[11px] sm:text-[13px] font-bold text-[#3A3A3C] dark:text-[#D1D1D6] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-all duration-200 active:scale-[0.95]"
+            className="flex flex-1 sm:flex-none min-w-0 flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 px-1 min-[420px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[420px]:text-[11px] sm:text-[13px] font-bold text-[#3A3A3C] dark:text-[#D1D1D6] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-all duration-200 active:scale-[0.95]"
           >
-            <LayoutGrid className="w-5 h-5 sm:w-[18px] sm:h-[18px]" />
-            More
+            <LayoutGrid className="w-5 h-5 sm:w-[18px] sm:h-[18px] shrink-0" />
+            <span className="truncate">More</span>
           </button>
         ) : null}
       </nav>
@@ -267,7 +273,7 @@ export default function Shell({
       {/* More sheet */}
       {moreOpen ? (
         <div
-          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] fade-in flex items-end sm:items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] fade-in flex items-end sm:items-center justify-center p-4 pb-[calc(6.75rem+env(safe-area-inset-bottom,0px))] sm:pb-4"
           onClick={() => setMoreOpen(false)}
         >
           <div

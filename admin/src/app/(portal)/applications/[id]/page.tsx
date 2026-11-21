@@ -89,6 +89,7 @@ export default async function ApplicationDetailPage({
         title={request.shop_name as string}
         subtitle="Access request"
         action={<RequestStatusPill status={request.status as string} />}
+        sticky
       />
 
       <Card className="p-5 md:p-6 mb-4">

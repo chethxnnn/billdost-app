@@ -220,6 +220,7 @@ export default async function ShopDetailPage({
         title={shop.name as string}
         subtitle={subtitle}
         action={<ShopStatusPill status={shop.status as string} />}
+        sticky
       />
 
       {shop.status === 'suspended' ? (

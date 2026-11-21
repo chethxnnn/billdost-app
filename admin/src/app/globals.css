@@ -22,6 +22,79 @@
 
 :root {
   --spring: cubic-bezier(0.32, 0.72, 0.24, 1);
+  /* The frosted shell header is exactly 60px tall (Shell.tsx). Every
+     sticky element in the portal pins against this one variable, so
+     the pattern can never drift out of sync with the header. */
+  --header-h: 60px;
+  /* Height of the Pipeline control bar (filters + search), which is
+     itself sticky; Pipeline list group heads pin below it. The bar
+     is built to a fixed height: its chips scroll horizontally
+     instead of wrapping, at every width. */
+  --pipeline-bar-h: 126px;
+}
+
+/*
+  Sticky pattern (the KPMG feel, Nov 22): some things pin while the
+  rest scrolls, and every pinned thing stops at the end of its own
+  section or card. Pure CSS position: sticky, no scroll listeners.
+  Pinned elements wear the frosted material so content scrolling
+  beneath them reads correctly.
+*/
+
+/* A full-width bar that pins under the shell header: detail page
+   titles, the Pipeline control bar. */
+.sticky-bar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 30;
+  background: rgba(245, 245, 247, 0.85);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .sticky-bar {
+  background: rgba(0, 0, 0, 0.72);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+/* A group header in a grouped list: pins under the header while its
+   group scrolls, then the next group pushes it away. */
+.sticky-group-head {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 20;
+  background: rgba(245, 245, 247, 0.85);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.dark .sticky-group-head {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* Same, but for Pipeline list groups, which pin below the sticky
+   Pipeline control bar instead of the shell header. */
+.sticky-group-head-pipeline {
+  top: calc(var(--header-h) + var(--pipeline-bar-h));
+}
+
+/* A header row inside a card (Today's attention queue): pins under
+   the shell header while the card's rows scroll beneath it, and
+   releases at the card's bottom edge. */
+.sticky-card-head {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .sticky-card-head {
+  background: rgba(28, 28, 30, 0.88);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
 }
 
 html {
@@ -115,15 +188,21 @@ h2 {
   animation: sheet-up 260ms var(--spring) both;
 }
 
-/* Dock entrance: settles up into place once per shell mount. */
+/* Dock entrance: settles up into place once per shell mount.
+   Only the Y axis animates here. The dock's horizontal centring
+   lives in Tailwind's translate utility (the native CSS translate
+   property); putting a -50% X into these keyframes as well stacked
+   the two shifts and parked the dock half its own width left of
+   centre, permanently, because the fill mode keeps the last
+   keyframe. Never put an X translation in this animation. */
 @keyframes dock-in {
   from {
     opacity: 0;
-    transform: translate(-50%, 12px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
   }
 }
 

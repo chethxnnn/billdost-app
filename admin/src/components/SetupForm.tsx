@@ -375,9 +375,14 @@ export default function SetupForm({
         </Card>
       </div>
 
-      {/* Live preview rail */}
-      <div className="space-y-4 lg:sticky lg:top-[84px]">
-        <div className="mx-auto w-[262px] rounded-[38px] bg-[#1D1D1F] p-[10px] shadow-xl shadow-black/10">
+      {/* Live preview rail. On desktop it sticks under the shell
+          header (offset from the one --header-h variable) while the
+          form column scrolls, and stops at the studio container's
+          end. On mobile it does not stick; the checklist with the
+          Create button leads the rail so it is never buried under
+          the previews. */}
+      <div className="flex flex-col gap-4 lg:sticky lg:top-[calc(var(--header-h)+1.5rem)]">
+        <div className="order-2 lg:order-1 mx-auto w-[262px] rounded-[38px] bg-[#1D1D1F] p-[10px] shadow-xl shadow-black/10">
           <div className="rounded-[30px] bg-[#F5F5F7] overflow-hidden">
             <div className="px-5 pt-5 pb-4">
               <p className="font-extrabold text-[15px] tracking-[-0.02em]">BillDost</p>
@@ -399,7 +404,7 @@ export default function SetupForm({
           </div>
         </div>
 
-        <Card className="p-5">
+        <Card className="p-5 order-3 lg:order-2">
           <p className="text-[12px] font-bold uppercase tracking-wide text-[#86868B] mb-1">
             Sample bill preview
           </p>
@@ -426,7 +431,7 @@ export default function SetupForm({
           </p>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-5 order-1 lg:order-3">
           <h2 className="text-[16px] font-bold mb-4">Setup checklist</h2>
           <ul className="space-y-3 mb-6">
             {checks.map((c) => (

@@ -9,6 +9,21 @@ import { describeAction } from '@/lib/audit-labels'
 
 export const dynamic = 'force-dynamic'
 
+const istDay = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+
+/** Day bucket (IST) for the log's sticky date headers. */
+function dayLabel(iso: string): string {
+  const key = istDay.format(new Date(iso))
+  if (key === istDay.format(new Date())) return 'Today'
+  if (key === istDay.format(new Date(Date.now() - 86400000))) return 'Yesterday'
+  return key
+}
+
 /**
  * The audit log view (plan Sections 6J and 12): who did what, to
  * which shop, when, in plain sentences. Filterable by admin and by
@@ -41,6 +56,17 @@ export default async function AuditPage({
   ])
   const adminName = new Map((admins ?? []).map((a) => [a.id as string, a.display_name as string]))
   const shopName = new Map((shops ?? []).map((s) => [s.id as string, s.name as string]))
+
+  // Entries arrive newest first; bucket consecutive entries by day
+  // so each day gets a sticky header over its own card.
+  type Entry = NonNullable<typeof entries>[number]
+  const dayGroups: { label: string; rows: Entry[] }[] = []
+  for (const e of entries ?? []) {
+    const label = dayLabel(e.created_at as string)
+    const last = dayGroups[dayGroups.length - 1]
+    if (last && last.label === label) last.rows.push(e)
+    else dayGroups.push({ label, rows: [e] })
+  }
 
   return (
     <div>
@@ -93,41 +119,51 @@ export default async function AuditPage({
           body="Admin actions will appear here as the team works. Try clearing the filters."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.07]">
-            {(entries ?? []).map((e) => {
-              const who = e.admin_user_id
-                ? adminName.get(e.admin_user_id as string) ?? 'A team member'
-                : 'The system'
-              const shopLabel = e.shop_id
-                ? shopName.get(e.shop_id as string) ?? 'a shop'
-                : ((e.details as { shop_name?: string })?.shop_name ?? '')
-              return (
-                <li key={e.id as string} className="px-5 py-3.5 text-[14px] font-medium leading-relaxed">
-                  <span className="font-bold">{who}</span>{' '}
-                  {describeAction(e.action as string)}{' '}
-                  {shopLabel ? (
-                    e.shop_id ? (
-                      <Link href={`/shops/${e.shop_id}`} className="font-semibold text-[#1B7A4A] dark:text-[#25D366] hover:underline underline-offset-4">
-                        {shopLabel}
-                      </Link>
-                    ) : (
-                      <span className="font-semibold">{shopLabel}</span>
+        <div className="space-y-5">
+          {dayGroups.map((g) => (
+            <section key={g.label}>
+              <p className="sticky-group-head text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-2 py-1.5 -mx-1 rounded-[8px]">
+                {g.label}{' '}
+                <span className="text-[#86868B] tabular-nums">{g.rows.length}</span>
+              </p>
+              <Card className="overflow-hidden">
+                <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.07]">
+                  {g.rows.map((e) => {
+                    const who = e.admin_user_id
+                      ? adminName.get(e.admin_user_id as string) ?? 'A team member'
+                      : 'The system'
+                    const shopLabel = e.shop_id
+                      ? shopName.get(e.shop_id as string) ?? 'a shop'
+                      : ((e.details as { shop_name?: string })?.shop_name ?? '')
+                    return (
+                      <li key={e.id as string} className="px-5 py-3.5 text-[14px] font-medium leading-relaxed">
+                        <span className="font-bold">{who}</span>{' '}
+                        {describeAction(e.action as string)}{' '}
+                        {shopLabel ? (
+                          e.shop_id ? (
+                            <Link href={`/shops/${e.shop_id}`} className="font-semibold text-[#1B7A4A] dark:text-[#25D366] hover:underline underline-offset-4">
+                              {shopLabel}
+                            </Link>
+                          ) : (
+                            <span className="font-semibold">{shopLabel}</span>
+                          )
+                        ) : null}
+                        {(e.details as { reason?: string })?.reason ? (
+                          <span className="text-[#5A5A5E] dark:text-[#A1A1A6]">
+                            {' '}· Reason: {(e.details as { reason?: string }).reason}
+                          </span>
+                        ) : null}
+                        <span className="block text-[12px] text-[#86868B] mt-0.5">
+                          {formatDateTime(e.created_at as string)}
+                        </span>
+                      </li>
                     )
-                  ) : null}
-                  {(e.details as { reason?: string })?.reason ? (
-                    <span className="text-[#5A5A5E] dark:text-[#A1A1A6]">
-                      {' '}· Reason: {(e.details as { reason?: string }).reason}
-                    </span>
-                  ) : null}
-                  <span className="block text-[12px] text-[#86868B] mt-0.5">
-                    {formatDateTime(e.created_at as string)}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        </Card>
+                  })}
+                </ul>
+              </Card>
+            </section>
+          ))}
+        </div>
       )}
     </div>
   )

@@ -353,7 +353,9 @@ export default async function DashboardPage() {
       ) : null}
 
       <Card className="p-5 mt-6">
-        <div className="flex items-baseline justify-between mb-1">
+        {/* The queue header pins inside the card while its rows
+            scroll beneath it, and stops at the card's bottom edge. */}
+        <div className="sticky-card-head -mx-5 -mt-5 px-5 pt-5 pb-3 mb-1 rounded-t-[20px] flex items-baseline justify-between">
           <h2 className="text-[16px] font-bold">Needs attention</h2>
           <Link href="/applications" className="text-[13px] font-bold text-[#1B7A4A] dark:text-[#25D366]">
             Pipeline

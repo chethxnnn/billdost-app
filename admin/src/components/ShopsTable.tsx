@@ -192,7 +192,7 @@ export default function ShopsTable({
         <div className="space-y-6">
           {grouped.map((g) => (
             <section key={g.key}>
-              <p className="text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-1">
+              <p className="sticky-group-head text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-2 py-1.5 -mx-1 rounded-[8px]">
                 {g.label} <span className="text-[#86868B] tabular-nums">{g.rows.length}</span>
               </p>
               <Card className="overflow-hidden">

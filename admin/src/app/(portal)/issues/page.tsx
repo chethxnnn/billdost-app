@@ -9,6 +9,16 @@ export const dynamic = 'force-dynamic'
 
 const FILTERS = ['open', 'new', 'investigating', 'fixed', 'informed', 'all'] as const
 
+/** Display sections, in workflow order. Each section header pins
+ *  under the shell header while its issues scroll, then the next
+ *  section pushes it away. */
+const STATUS_SECTIONS = [
+  { key: 'new', label: 'New' },
+  { key: 'investigating', label: 'Investigating' },
+  { key: 'fixed', label: 'Fixed' },
+  { key: 'informed', label: 'Informed' },
+] as const
+
 export default async function IssuesPage({
   searchParams,
 }: {
@@ -126,18 +136,32 @@ export default async function IssuesPage({
           }
         />
       ) : (
-        <div className="space-y-3">
-          {visible.map((g) => (
-            <IssueGroupCard
-              key={g.digest}
-              group={g}
-              canEdit={can(admin.role, 'issues_status')}
-              highlighted={highlight === g.digest}
-              members={memberOptions}
-              currentAdminId={admin.id}
-              canAssign={can(admin.role, 'assign')}
-            />
-          ))}
+        <div className="space-y-6">
+          {STATUS_SECTIONS.map((sec) => {
+            const rows = visible.filter((g) => g.status === sec.key)
+            if (rows.length === 0) return null
+            return (
+              <section key={sec.key}>
+                <p className="sticky-group-head text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-2 py-1.5 -mx-1 rounded-[8px]">
+                  {sec.label}{' '}
+                  <span className="text-[#86868B] tabular-nums">{rows.length}</span>
+                </p>
+                <div className="space-y-3">
+                  {rows.map((g) => (
+                    <IssueGroupCard
+                      key={g.digest}
+                      group={g}
+                      canEdit={can(admin.role, 'issues_status')}
+                      highlighted={highlight === g.digest}
+                      members={memberOptions}
+                      currentAdminId={admin.id}
+                      canAssign={can(admin.role, 'assign')}
+                    />
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </div>
       )}
     </div>

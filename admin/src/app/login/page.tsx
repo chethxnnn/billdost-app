@@ -47,7 +47,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12">
+    <div className="min-h-dvh flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-[400px] page-enter">
         <div className="text-center mb-8">
           <p className="font-extrabold text-[32px] tracking-[-0.02em]">BillDost</p>

@@ -120,13 +120,27 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  sticky = false,
 }: {
   title: string
   subtitle?: string
   action?: ReactNode
+  /**
+   * Detail pages pass sticky: the summary header pins under the
+   * shell header (frosted, full-bleed across the canvas padding)
+   * while the detail content scrolls beneath it, and releases at
+   * the end of the page like everything else in the sticky system.
+   */
+  sticky?: boolean
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+    <div
+      className={
+        sticky
+          ? 'sticky-bar -mx-4 md:-mx-6 px-4 md:px-6 -mt-6 md:-mt-8 py-4 mb-6 flex flex-wrap items-end justify-between gap-4'
+          : 'flex flex-wrap items-end justify-between gap-4 mb-6'
+      }
+    >
       <div>
         <h1 className="text-[28px] md:text-[32px] font-extrabold tracking-tight leading-tight">
           {title}

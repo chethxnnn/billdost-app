@@ -31,7 +31,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="bg-[#F5F5F7] dark:bg-black text-[#1D1D1F] dark:text-[#F5F5F7] min-h-screen">
+      <body className="bg-[#F5F5F7] dark:bg-black text-[#1D1D1F] dark:text-[#F5F5F7] min-h-dvh">
         {children}
       </body>
     </html>

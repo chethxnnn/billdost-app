@@ -161,34 +161,40 @@ export default function RequestsBoard({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="flex flex-wrap gap-2 flex-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => setStatus(f)}
-              className={`px-3.5 py-2 rounded-full text-[13px] font-bold transition-colors duration-200 ${
-                status === f
-                  ? 'bg-[#1D1D1F] text-white dark:bg-white dark:text-black'
-                  : 'bg-black/[0.04] dark:bg-white/[0.07] text-[#3A3A3C] dark:text-[#D1D1D6] hover:bg-black/[0.08] dark:hover:bg-white/[0.12]'
-              }`}
-            >
-              {FILTER_LABELS[f]}
-              {f !== 'all' && counts.get(f) ? (
-                <span className="ml-1.5 tabular-nums opacity-70">{counts.get(f)}</span>
-              ) : null}
-            </button>
-          ))}
+      {/* Control bar: pins under the shell header in both views.
+          Its height is fixed (--pipeline-bar-h) because the filter
+          chips scroll sideways instead of wrapping, at every width;
+          list group heads pin exactly below it. */}
+      <div className="sticky-bar -mx-4 md:-mx-6 px-4 md:px-6 -mt-2 pt-3 pb-3 mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex gap-2 flex-1 min-w-0 overflow-x-auto">
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                onClick={() => setStatus(f)}
+                className={`shrink-0 whitespace-nowrap px-3.5 py-2 rounded-full text-[13px] font-bold transition-colors duration-200 ${
+                  status === f
+                    ? 'bg-[#1D1D1F] text-white dark:bg-white dark:text-black'
+                    : 'bg-black/[0.04] dark:bg-white/[0.07] text-[#3A3A3C] dark:text-[#D1D1D6] hover:bg-black/[0.08] dark:hover:bg-white/[0.12]'
+                }`}
+              >
+                {FILTER_LABELS[f]}
+                {f !== 'all' && counts.get(f) ? (
+                  <span className="ml-1.5 tabular-nums opacity-70">{counts.get(f)}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+          {viewToggle}
         </div>
-        {viewToggle}
-      </div>
 
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search by shop, owner or phone"
-        className="w-full px-4 py-3 mb-4 bg-white dark:bg-[#1C1C1E] border border-black/[0.06] dark:border-white/[0.08] rounded-2xl text-[15px] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 transition-all"
-      />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by shop, owner or phone"
+          className="w-full px-4 py-3 bg-white dark:bg-[#1C1C1E] border border-black/[0.06] dark:border-white/[0.08] rounded-2xl text-[15px] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 transition-all"
+        />
+      </div>
 
       {requests.length === 0 ? (
         <EmptyState
@@ -197,16 +203,19 @@ export default function RequestsBoard({
         />
       ) : view === 'board' ? (
         <>
-          <div className="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 lg:max-h-[calc(100dvh-20rem)] lg:min-h-[16rem]">
             {STAGES.map((stage) => {
               const cards = searched.filter((r) => stageOf(r) === stage.key)
               return (
-                <div key={stage.key} className="w-[248px] shrink-0">
-                  <div className="flex items-baseline justify-between px-1 mb-2">
+                <div key={stage.key} className="w-[248px] shrink-0 flex flex-col min-h-0">
+                  <div className="flex items-baseline justify-between px-1 mb-2 shrink-0">
                     <p className="text-[13px] font-extrabold tracking-[-0.01em]">{stage.label}</p>
                     <span className="text-[12px] font-bold text-[#86868B] tabular-nums">{cards.length}</span>
                   </div>
-                  <div className="space-y-2">
+                  {/* On desktop the column header stays fixed while
+                      its cards scroll inside the column, and the
+                      column ends at the board's bottom edge. */}
+                  <div className="space-y-2 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pb-1">
                     {cards.length === 0 ? (
                       <p className="text-[12px] font-medium text-[#86868B] px-1 py-3">Nothing here.</p>
                     ) : (
@@ -276,7 +285,7 @@ export default function RequestsBoard({
             if (rows.length === 0) return null
             return (
               <section key={stage.key}>
-                <p className="text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-1">
+                <p className="sticky-group-head sticky-group-head-pipeline text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-2 py-1.5 -mx-1 rounded-[8px]">
                   {stage.label}{' '}
                   <span className="text-[#86868B] tabular-nums">{rows.length}</span>
                 </p>
@@ -348,7 +357,7 @@ export default function RequestsBoard({
           })}
           {visible.some((r) => r.status === 'rejected') ? (
             <section>
-              <p className="text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-1">
+              <p className="sticky-group-head sticky-group-head-pipeline text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-2 py-1.5 -mx-1 rounded-[8px]">
                 Rejected{' '}
                 <span className="text-[#86868B] tabular-nums">
                   {visible.filter((r) => r.status === 'rejected').length}
