@@ -7,7 +7,7 @@ export default function AuthLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#09090B] flex flex-col relative overflow-hidden transition-colors duration-500">
+    <div className="min-h-screen bg-[#F5F5F7] dark:bg-[#000000] flex flex-col relative overflow-hidden transition-colors duration-500">
       {/* Subtle Apple-style mesh background blobs */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-[#1B7A4A]/10 dark:bg-[#25D366]/10 blur-[120px] mix-blend-multiply dark:mix-blend-screen opacity-50 dark:opacity-20 animate-pulse" style={{ animationDuration: '8s' }} />
@@ -36,7 +36,7 @@ export default function AuthLayout({
       </main>
 
       {/* Footer */}
-      <footer className="px-6 py-6 text-center text-[13px] font-medium text-[#86868B] dark:text-[#98989D] relative z-10">
+      <footer className="px-6 py-6 text-center text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D] relative z-10">
         © {new Date().getFullYear()} BillDost Technologies Pvt Ltd · Built in Bengaluru 🇮🇳
       </footer>
     </div>

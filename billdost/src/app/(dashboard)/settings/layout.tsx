@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Store, Receipt, Users } from 'lucide-react'
+import { Store, Receipt, Users, MessageCircle } from 'lucide-react'
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -11,6 +11,10 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     { name: 'General', href: '/settings', icon: Store },
     { name: 'Invoices & Quotations', href: '/settings/invoices', icon: Receipt },
     { name: 'Staff & Roles', href: '/settings/staff', icon: Users },
+    // WhatsApp must be reachable on a phone too: it was previously only
+    // linked from the desktop sidebar, so the product's core promise
+    // (WhatsApp billing) had no path on mobile.
+    { name: 'WhatsApp', href: '/settings/whatsapp', icon: MessageCircle },
   ]
 
   return (
@@ -33,7 +37,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${
                   isActive 
                     ? 'bg-[#1B7A4A] text-white shadow-md' 
-                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-[#1E1C1A] dark:text-[#9A9690]'
+                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] dark:text-[#98989D]'
                 }`}
               >
                 <Icon className="w-5 h-5" />

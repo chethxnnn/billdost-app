@@ -61,7 +61,7 @@ export function StockAdjustModal({ product, onClose, onSuccess }: Props) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div 
-        className="bg-white dark:bg-[#161513] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-[#1C1C1E] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-6 border-b border-black/5 dark:border-white/5 bg-gray-50/50 dark:bg-[#1C1C1E]/50">

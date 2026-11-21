@@ -4,11 +4,12 @@ import React, { useState, useMemo } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { Search, AlertTriangle, Box, ArrowRightLeft, IndianRupee } from 'lucide-react'
 import { StockAdjustModal } from '@/components/inventory/StockAdjustModal'
+import { BatchExpiryTab } from '@/components/inventory/BatchExpiryTab'
 
 import { format } from 'date-fns'
 
 export default function InventoryPage() {
-  const [activeTab, setActiveTab] = useState<'stock' | 'history' | 'report'>('stock')
+  const [activeTab, setActiveTab] = useState<'stock' | 'history' | 'report' | 'expiry'>('stock')
   const [search, setSearch] = useState('')
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
 
@@ -63,7 +64,7 @@ export default function InventoryPage() {
 
       {/* Top Dashboards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-[#161513] border border-black/5 dark:border-white/5 p-5 rounded-3xl shadow-sm">
+        <div className="bg-white dark:bg-[#1C1C1E] border border-black/5 dark:border-white/5 p-5 rounded-3xl shadow-sm">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
               <Box className="w-5 h-5" />
@@ -73,7 +74,7 @@ export default function InventoryPage() {
           <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">{totalItems.toLocaleString()}</p>
         </div>
 
-        <div className="bg-white dark:bg-[#161513] border border-black/5 dark:border-white/5 p-5 rounded-3xl shadow-sm">
+        <div className="bg-white dark:bg-[#1C1C1E] border border-black/5 dark:border-white/5 p-5 rounded-3xl shadow-sm">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-[#1B7A4A]/10 dark:bg-[#25D366]/10 text-[#1B7A4A] dark:text-[#25D366] flex items-center justify-center">
               <IndianRupee className="w-5 h-5" />
@@ -83,7 +84,7 @@ export default function InventoryPage() {
           <p className="text-3xl font-black text-gray-900 dark:text-white mt-2">₹{totalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
         </div>
 
-        <div className={`bg-white dark:bg-[#161513] border border-black/5 dark:border-white/5 p-5 rounded-3xl shadow-sm relative overflow-hidden ${lowStockItems.length > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
+        <div className={`bg-white dark:bg-[#1C1C1E] border border-black/5 dark:border-white/5 p-5 rounded-3xl shadow-sm relative overflow-hidden ${lowStockItems.length > 0 ? 'ring-2 ring-red-500/50' : ''}`}>
           {lowStockItems.length > 0 && <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/10 rounded-bl-full" />}
           <div className="flex items-center gap-3 mb-2">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${lowStockItems.length > 0 ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
@@ -117,10 +118,16 @@ export default function InventoryPage() {
         >
           Report
         </button>
+        <button
+          onClick={() => setActiveTab('expiry')}
+          className={`px-4 sm:px-6 py-3 font-bold text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'expiry' ? 'border-[#1B7A4A] dark:border-[#25D366] text-[#1B7A4A] dark:text-[#25D366]' : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+        >
+          Batch & Expiry
+        </button>
       </div>
 
       {/* Main Grid */}
-      <div className="bg-white dark:bg-[#161513] border border-black/5 dark:border-white/5 rounded-3xl shadow-sm overflow-hidden flex flex-col min-h-[400px] max-h-[calc(100vh-280px)]">
+      <div className="bg-white dark:bg-[#1C1C1E] border border-black/5 dark:border-white/5 rounded-3xl shadow-sm overflow-hidden flex flex-col min-h-[400px] max-h-[calc(100vh-280px)]">
         
         {activeTab === 'stock' && (
           <>
@@ -194,7 +201,7 @@ export default function InventoryPage() {
                           <td className="px-6 py-4 text-right">
                             <button
                               onClick={() => setSelectedProduct(product)}
-                              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 font-bold transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 font-bold transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
                             >
                               <ArrowRightLeft className="w-4 h-4" />
                               Adjust
@@ -259,6 +266,9 @@ export default function InventoryPage() {
           </div>
         )}
 
+        {/* Batch & Expiry Tab */}
+        {activeTab === 'expiry' && <BatchExpiryTab />}
+
         {/* Report Tab */}
         {activeTab === 'report' && (
           <div className="flex flex-col h-full">
@@ -266,7 +276,7 @@ export default function InventoryPage() {
               <select 
                 value={reportMonth} 
                 onChange={e => setReportMonth(Number(e.target.value))}
-                className="px-4 py-2 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#161513] text-sm font-bold dark:text-white outline-none"
+                className="px-4 py-2 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm font-bold dark:text-white outline-none"
               >
                 {Array.from({length: 12}).map((_, i) => (
                   <option key={i+1} value={i+1}>{format(new Date(2020, i, 1), 'MMMM')}</option>
@@ -275,7 +285,7 @@ export default function InventoryPage() {
               <select 
                 value={reportYear} 
                 onChange={e => setReportYear(Number(e.target.value))}
-                className="px-4 py-2 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#161513] text-sm font-bold dark:text-white outline-none"
+                className="px-4 py-2 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm font-bold dark:text-white outline-none"
               >
                 {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
@@ -297,7 +307,7 @@ export default function InventoryPage() {
                       return acc
                     }, {})
                   ).map(([productName, stats]: any) => (
-                    <div key={productName} className="bg-white dark:bg-[#161513] p-5 rounded-2xl border border-black/5 dark:border-white/5 shadow-sm">
+                    <div key={productName} className="bg-white dark:bg-[#1C1C1E] p-5 rounded-2xl border border-black/5 dark:border-white/5 shadow-sm">
                       <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-4">{productName}</h3>
                       <div className="grid grid-cols-3 gap-4 mb-4">
                         <div className="bg-gray-50 dark:bg-[#1C1C1E] p-3 rounded-xl border border-black/5 dark:border-white/5"><span className="text-xs text-gray-500 block">Total Added</span><span className="font-black text-green-500">+{stats.in}</span></div>

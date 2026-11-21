@@ -1,6 +1,6 @@
 'use client'
 
-import type { OnboardingData } from '@/app/(auth)/onboarding/page'
+import type { OnboardingData } from '@/components/onboarding/types'
 
 interface Props {
   data: OnboardingData
@@ -14,7 +14,7 @@ const LANGUAGES = [
     id: 'hinglish',
     name: 'Hinglish',
     native: 'English + हिन्दी mix',
-    desc: 'Jaise aap baat karte ho — sabse popular',
+    desc: 'Jaise aap baat karte ho - sabse popular',
     preview: '"Namaskar! Aapka bill ready hai 🧾"',
     bg: '#34C759',
     recommended: true,
@@ -32,7 +32,7 @@ const LANGUAGES = [
     id: 'hi',
     name: 'Hindi',
     native: 'हिन्दी',
-    desc: 'पूरा हिन्दी — मेनू और बिल दोनों',
+    desc: 'पूरा हिन्दी - मेनू और बिल दोनों',
     preview: '"नमस्कार! आपका बिल तैयार है 🧾"',
     bg: '#FF9F0A',
     recommended: false,
@@ -41,7 +41,7 @@ const LANGUAGES = [
     id: 'kn',
     name: 'Kannada',
     native: 'ಕನ್ನಡ',
-    desc: 'ಪೂರ್ಣ ಕನ್ನಡ — ಮೆನು ಮತ್ತು ಬಿಲ್',
+    desc: 'ಪೂರ್ಣ ಕನ್ನಡ - ಮೆನು ಮತ್ತು ಬಿಲ್',
     preview: '"ನಮಸ್ಕಾರ! ನಿಮ್ಮ ಬಿಲ್ ಸಿದ್ಧವಾಗಿದೆ 🧾"',
     bg: '#FF375F',
     recommended: false,
@@ -58,7 +58,7 @@ export default function StepLanguage({ data, updateData, onNext, onBack }: Props
         <h1 className="text-[28px] md:text-[32px] font-extrabold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight mb-3 leading-tight">
           Choose Language
         </h1>
-        <p className="text-[15px] text-[#86868B] dark:text-[#98989D] font-medium max-w-sm mx-auto">
+        <p className="text-[15px] text-[#6E6E73] dark:text-[#98989D] font-medium max-w-sm mx-auto">
           This language will be used across your dashboard and on customer invoices.
         </p>
       </div>
@@ -88,14 +88,14 @@ export default function StepLanguage({ data, updateData, onNext, onBack }: Props
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1">
                     <span className="font-bold text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7]">{lang.name}</span>
-                    <span className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">{lang.native}</span>
+                    <span className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D]">{lang.native}</span>
                     {lang.recommended && (
                       <span className="text-[10px] font-bold px-2.5 py-1 bg-[#34C759] text-white rounded-md tracking-wider shadow-sm">
                         RECOMMENDED
                       </span>
                     )}
                   </div>
-                  <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D] mb-3 leading-snug">{lang.desc}</p>
+                  <p className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D] mb-3 leading-snug">{lang.desc}</p>
                   
                   <div className={`inline-block px-4 py-2 rounded-xl transition-colors duration-300 ${isSelected ? 'bg-white dark:bg-[#1C1C1E] shadow-sm' : 'bg-black/5 dark:bg-white/5 group-hover:bg-black/10 dark:group-hover:bg-white/10'}`}>
                     <p className="text-[13px] font-semibold italic text-[#1D1D1F] dark:text-[#F5F5F7]">

@@ -1,6 +1,6 @@
 'use client'
 
-import type { OnboardingData } from '@/app/(auth)/onboarding/page'
+import type { OnboardingData } from '@/components/onboarding/types'
 
 interface Props {
   data: OnboardingData
@@ -33,7 +33,7 @@ export default function StepCategory({ data, updateData, onNext, onBack }: Props
         <h1 className="text-[28px] md:text-[32px] font-extrabold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight mb-3 leading-tight">
           What type of business?
         </h1>
-        <p className="text-[15px] text-[#86868B] dark:text-[#98989D] font-medium max-w-sm mx-auto">
+        <p className="text-[15px] text-[#6E6E73] dark:text-[#98989D] font-medium max-w-sm mx-auto">
           We'll tailor your default products and settings based on this.
         </p>
       </div>
@@ -65,7 +65,7 @@ export default function StepCategory({ data, updateData, onNext, onBack }: Props
                 <span className="text-2xl">{cat.icon}</span>
               </div>
               <div className="font-bold text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] leading-tight mb-1">{cat.label}</div>
-              <div className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D] leading-snug">{cat.desc}</div>
+              <div className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D] leading-snug">{cat.desc}</div>
             </button>
           )
         })}

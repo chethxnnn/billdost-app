@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const type = searchParams.get('type')
   const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
@@ -11,10 +12,25 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      // Check if user has completed onboarding
+      // Password recovery links land here with a live session: the user
+      // must set a new password before anything else (blueprint C13).
+      if (type === 'recovery' || next === '/reset-password') {
+        return NextResponse.redirect(`${origin}/reset-password`)
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
+        // Invited staff first (blueprint B.9, C4): if this user has a
+        // pending staff invite, accept_staff_invite flips the row to
+        // active and returns the shop. This ordering is what stops
+        // invited staff being bounced into onboarding to create their
+        // own shop.
+        const { data: invitedShopId } = await supabase.rpc('accept_staff_invite')
+        if (invitedShopId) {
+          return NextResponse.redirect(`${origin}${next}`)
+        }
+
         const { data: shop } = await supabase
           .from('shops')
           .select('onboarding_done')

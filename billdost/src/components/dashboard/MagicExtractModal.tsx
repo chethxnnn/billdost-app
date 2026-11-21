@@ -130,7 +130,7 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white dark:bg-[#161513] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="px-6 py-5 border-b border-black/5 dark:border-white/5 flex items-center justify-between bg-gradient-to-r from-[#1B7A4A]/5 to-[#25D366]/5">
@@ -140,10 +140,10 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">Magic Extract</h2>
-              <p className="text-sm text-[#86868B] dark:text-[#98989D] font-medium">Auto-fill your catalog using AI</p>
+              <p className="text-sm text-[#6E6E73] dark:text-[#98989D] font-medium">Auto-fill your catalog using AI</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-[#86868B] hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-[#6E6E73] hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
             ✕
           </button>
         </div>
@@ -176,10 +176,10 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
                     <table className="w-full text-left border-collapse">
                       <thead className="bg-[#F7F7F5] dark:bg-[#1C1C1E] sticky top-0 z-10">
                         <tr>
-                          <th className="px-4 py-3 text-[12px] font-bold text-[#86868B] dark:text-[#98989D] uppercase tracking-wider">Item Name</th>
-                          <th className="px-4 py-3 text-[12px] font-bold text-[#86868B] dark:text-[#98989D] uppercase tracking-wider w-32">Price (₹)</th>
-                          <th className="px-4 py-3 text-[12px] font-bold text-[#86868B] dark:text-[#98989D] uppercase tracking-wider w-40">Category</th>
-                          <th className="px-4 py-3 text-[12px] font-bold text-[#86868B] dark:text-[#98989D] uppercase tracking-wider w-16"></th>
+                          <th className="px-4 py-3 text-[12px] font-bold text-[#6E6E73] dark:text-[#98989D] uppercase tracking-wider">Item Name</th>
+                          <th className="px-4 py-3 text-[12px] font-bold text-[#6E6E73] dark:text-[#98989D] uppercase tracking-wider w-32">Price (₹)</th>
+                          <th className="px-4 py-3 text-[12px] font-bold text-[#6E6E73] dark:text-[#98989D] uppercase tracking-wider w-40">Category</th>
+                          <th className="px-4 py-3 text-[12px] font-bold text-[#6E6E73] dark:text-[#98989D] uppercase tracking-wider w-16"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-black/5 dark:divide-white/5">
@@ -205,13 +205,13 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
                                 value={item.category || ''}
                                 onChange={(e) => updateItem(i, 'category', e.target.value)}
                                 placeholder="e.g. Starters"
-                                className="w-full bg-transparent border border-transparent focus:border-[#1B7A4A] rounded-md px-2 py-1.5 text-[14px] text-[#86868B] dark:text-[#98989D] outline-none"
+                                className="w-full bg-transparent border border-transparent focus:border-[#1B7A4A] rounded-md px-2 py-1.5 text-[14px] text-[#6E6E73] dark:text-[#98989D] outline-none"
                               />
                             </td>
                             <td className="px-4 py-2 text-right">
                               <button 
                                 onClick={() => removeItem(i)}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-md transition-all"
+                                className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-md transition-all"
                               >
                                 ✕
                               </button>
@@ -235,13 +235,13 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
                 <div className="flex p-1 bg-black/5 dark:bg-white/5 rounded-xl w-max mb-6 mx-auto">
                   <button 
                     onClick={() => setTab('image')}
-                    className={`px-5 py-2 rounded-lg text-[14px] font-semibold transition-all ${tab === 'image' ? 'bg-white dark:bg-[#2C2C2E] shadow-sm text-[#1D1D1F] dark:text-[#F5F5F7]' : 'text-[#86868B] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'}`}
+                    className={`px-5 py-2 rounded-lg text-[14px] font-semibold transition-all ${tab === 'image' ? 'bg-white dark:bg-[#2C2C2E] shadow-sm text-[#1D1D1F] dark:text-[#F5F5F7]' : 'text-[#6E6E73] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'}`}
                   >
                     From Image
                   </button>
                   <button 
                     onClick={() => setTab('url')}
-                    className={`px-5 py-2 rounded-lg text-[14px] font-semibold transition-all ${tab === 'url' ? 'bg-white dark:bg-[#2C2C2E] shadow-sm text-[#1D1D1F] dark:text-[#F5F5F7]' : 'text-[#86868B] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'}`}
+                    className={`px-5 py-2 rounded-lg text-[14px] font-semibold transition-all ${tab === 'url' ? 'bg-white dark:bg-[#2C2C2E] shadow-sm text-[#1D1D1F] dark:text-[#F5F5F7]' : 'text-[#6E6E73] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'}`}
                   >
                     From Website
                   </button>
@@ -264,7 +264,7 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
                         <>
                           <Spinner />
                           <p className="mt-4 font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Reading Image...</p>
-                          <p className="text-[13px] text-[#86868B] dark:text-[#98989D] mt-1">Our AI is extracting products. This takes a few seconds.</p>
+                          <p className="text-[13px] text-[#6E6E73] dark:text-[#98989D] mt-1">Our AI is extracting products. This takes a few seconds.</p>
                         </>
                       ) : (
                         <>
@@ -272,7 +272,7 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                           </div>
                           <p className="font-bold text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7]">Click to upload menu or catalog</p>
-                          <p className="text-[14px] text-[#86868B] dark:text-[#98989D] mt-2">PNG, JPG up to 5MB</p>
+                          <p className="text-[14px] text-[#6E6E73] dark:text-[#98989D] mt-2">PNG, JPG up to 5MB</p>
                         </>
                       )}
                     </div>
@@ -285,7 +285,7 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
                     </div>
                     <h3 className="font-bold text-[18px] text-[#1D1D1F] dark:text-[#F5F5F7] mb-2">Extract from a Website</h3>
-                    <p className="text-[14px] text-[#86868B] dark:text-[#98989D] mb-6">Paste a link to your Swiggy/Zomato menu, or your own e-commerce store to auto-extract items.</p>
+                    <p className="text-[14px] text-[#6E6E73] dark:text-[#98989D] mb-6">Paste a link to your Swiggy/Zomato menu, or your own e-commerce store to auto-extract items.</p>
                     
                     <div className="flex flex-col gap-3">
                       <input 
@@ -319,11 +319,11 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
 
         {/* Footer */}
         {previewItems.length > 0 && (
-          <div className="px-6 py-4 border-t border-black/5 dark:border-white/5 flex gap-3 flex-shrink-0 bg-white dark:bg-[#161513]">
+          <div className="px-6 py-4 border-t border-black/5 dark:border-white/5 flex gap-3 flex-shrink-0 bg-white dark:bg-[#1C1C1E]">
             <button
               onClick={onClose}
               disabled={isSaving}
-              className="px-6 py-3 rounded-xl border border-black/10 dark:border-white/10 text-sm font-semibold text-[#86868B] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+              className="px-6 py-3 rounded-xl border border-black/10 dark:border-white/10 text-sm font-semibold text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>

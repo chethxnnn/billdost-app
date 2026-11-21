@@ -2,7 +2,7 @@
 
 import { useRef } from 'react'
 import { toast } from 'sonner'
-import type { OnboardingData } from '@/app/(auth)/onboarding/page'
+import type { OnboardingData } from '@/components/onboarding/types'
 
 interface Props {
   data: OnboardingData
@@ -35,7 +35,7 @@ export default function StepBusinessInfo({ data, updateData, onNext }: Props) {
         <h1 className="text-[28px] md:text-[32px] font-extrabold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight mb-3 leading-tight">
           What's your business name?
         </h1>
-        <p className="text-[15px] text-[#86868B] dark:text-[#98989D] font-medium max-w-sm mx-auto">
+        <p className="text-[15px] text-[#6E6E73] dark:text-[#98989D] font-medium max-w-sm mx-auto">
           This will appear on all your invoices. You can always change it later in settings.
         </p>
       </div>
@@ -52,7 +52,7 @@ export default function StepBusinessInfo({ data, updateData, onNext }: Props) {
             onChange={(e) => updateData({ shopName: e.target.value })}
             placeholder="e.g. Sharma General Store"
             autoFocus
-            className="w-full px-4 py-4 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#86868B] dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 dark:focus:ring-[#25D366]/10 transition-all duration-300 shadow-sm"
+            className="w-full px-4 py-4 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#6E6E73] dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 dark:focus:ring-[#25D366]/10 transition-all duration-300 shadow-sm"
           />
         </div>
 
@@ -62,7 +62,7 @@ export default function StepBusinessInfo({ data, updateData, onNext }: Props) {
             <label className="block text-[13px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">
               Business Logo
             </label>
-            <span className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D]">Optional</span>
+            <span className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D]">Optional</span>
           </div>
 
           <div
@@ -85,14 +85,14 @@ export default function StepBusinessInfo({ data, updateData, onNext }: Props) {
                 </div>
                 <div>
                   <p className="text-[15px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Upload a logo</p>
-                  <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D] mt-1">PNG or JPG, max 2MB</p>
+                  <p className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-1">PNG or JPG, max 2MB</p>
                 </div>
               </div>
             )}
           </div>
           <input ref={fileRef} type="file" accept="image/*" onChange={handleLogo} className="hidden" />
           
-          <p className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D] mt-4 text-center">
+          <p className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-4 text-center">
             Don't have a logo? No worries, we'll generate a beautiful initial logo for you! ✨
           </p>
         </div>

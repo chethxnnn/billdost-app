@@ -59,7 +59,9 @@ export default function NotificationDropdown() {
       <button
         id="notification-bell"
         onClick={handleToggle}
-        className="relative w-10 h-10 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/5 text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/10 dark:hover:bg-white/10 transition-all hover:scale-105 flex-shrink-0"
+        aria-label="Notifications"
+        aria-expanded={open}
+        className="relative w-11 h-11 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/5 text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/10 dark:hover:bg-white/10 transition-all hover:scale-105 flex-shrink-0"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -89,10 +91,10 @@ export default function NotificationDropdown() {
               <div className="p-5 space-y-4">
                 {[...Array(4)].map((_, i) => (
                   <div key={i} className="flex gap-3 animate-pulse">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-[#2E2C28] flex-shrink-0" />
+                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-[#38383A] flex-shrink-0" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3.5 bg-gray-200 dark:bg-[#2E2C28] rounded w-4/5" />
-                      <div className="h-2.5 bg-gray-200 dark:bg-[#2E2C28] rounded w-1/3" />
+                      <div className="h-3.5 bg-gray-200 dark:bg-[#38383A] rounded w-4/5" />
+                      <div className="h-2.5 bg-gray-200 dark:bg-[#38383A] rounded w-1/3" />
                     </div>
                   </div>
                 ))}

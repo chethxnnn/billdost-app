@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { OnboardingData } from '@/app/(auth)/onboarding/page'
+import type { OnboardingData } from '@/components/onboarding/types'
 
 interface Props {
   data: OnboardingData
@@ -48,7 +48,7 @@ export default function StepComplete({ data, saving, onSave, onBack }: Props) {
         <h1 className="text-[28px] md:text-[32px] font-extrabold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight mb-3 leading-tight">
           You're all set!
         </h1>
-        <p className="text-[15px] text-[#86868B] dark:text-[#98989D] font-medium max-w-sm mx-auto">
+        <p className="text-[15px] text-[#6E6E73] dark:text-[#98989D] font-medium max-w-sm mx-auto">
           Your shop is ready on BillDost. Review your details below and let's get started.
         </p>
       </div>
@@ -88,12 +88,11 @@ export default function StepComplete({ data, saving, onSave, onBack }: Props) {
 
         {/* Details */}
         <div className="p-2">
-          <SummaryRow label="Category" value={CATEGORY_LABELS[data.category] || '—'} icon="📂" />
+          <SummaryRow label="Category" value={CATEGORY_LABELS[data.category] || '-'} icon="📂" />
           <SummaryRow label="GST" value={data.hasGST ? data.gstin : 'Not registered'} icon="📋" />
           <SummaryRow label="Products" value={`${data.products.length} items`} icon="📦" />
           <SummaryRow label="UPI" value={data.upiId || 'Not set'} icon="💳" />
           <SummaryRow label="Language" value={LANGUAGE_LABELS[data.language] || 'Hinglish'} icon="🌐" />
-          <SummaryRow label="Security" value={data.pin ? 'PIN Set' : 'No PIN'} icon="🔐" />
           <SummaryRow label="Staff" value={data.staffMembers.length > 0 ? `${data.staffMembers.length} member(s)` : 'Only you'} icon="👥" />
         </div>
       </div>
@@ -126,7 +125,7 @@ export default function StepComplete({ data, saving, onSave, onBack }: Props) {
         <button
           onClick={onBack}
           disabled={saving}
-          className="w-full mt-4 py-3 text-[14px] font-semibold text-[#86868B] dark:text-[#98989D] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] transition-colors"
+          className="w-full mt-4 py-3 text-[14px] font-semibold text-[#6E6E73] dark:text-[#98989D] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] transition-colors"
         >
           Go back to edit details
         </button>
@@ -142,7 +141,7 @@ function SummaryRow({ label, value, icon }: { label: string; value: string; icon
         <div className="w-8 h-8 rounded-[10px] bg-black/5 dark:bg-white/5 flex items-center justify-center text-lg">
           {icon}
         </div>
-        <span className="text-[14px] font-semibold text-[#86868B] dark:text-[#98989D]">{label}</span>
+        <span className="text-[14px] font-semibold text-[#6E6E73] dark:text-[#98989D]">{label}</span>
       </div>
       <div className="text-[14px] font-bold text-[#1D1D1F] dark:text-[#F5F5F7] text-right max-w-[180px] truncate">
         {value}

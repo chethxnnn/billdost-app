@@ -1,6 +1,6 @@
 'use client'
 
-import type { OnboardingData } from '@/app/(auth)/onboarding/page'
+import type { OnboardingData } from '@/components/onboarding/types'
 
 interface Props {
   data: OnboardingData
@@ -23,7 +23,7 @@ export default function StepGST({ data, updateData, onNext, onBack }: Props) {
         <h1 className="text-[28px] md:text-[32px] font-extrabold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight mb-3 leading-tight">
           Are you GST registered?
         </h1>
-        <p className="text-[15px] text-[#86868B] dark:text-[#98989D] font-medium max-w-sm mx-auto">
+        <p className="text-[15px] text-[#6E6E73] dark:text-[#98989D] font-medium max-w-sm mx-auto">
           If yes, your invoices will include GSTIN and automated tax breakdowns.
         </p>
       </div>
@@ -37,7 +37,7 @@ export default function StepGST({ data, updateData, onNext, onBack }: Props) {
           <div className="flex items-center justify-between">
             <div>
               <div className="font-bold text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7]">GST Registration</div>
-              <div className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D] mt-1">Do you have a valid GSTIN?</div>
+              <div className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-1">Do you have a valid GSTIN?</div>
             </div>
             
             {/* Apple-style Switch */}
@@ -67,7 +67,7 @@ export default function StepGST({ data, updateData, onNext, onBack }: Props) {
               onChange={(e) => updateData({ gstin: e.target.value.toUpperCase().slice(0, 15) })}
               placeholder="27AABCU9603R1ZX"
               maxLength={15}
-              className={`w-full px-4 py-4 bg-white dark:bg-[#1C1C1E] border rounded-2xl text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7] font-mono tracking-widest placeholder:text-[#86868B] dark:placeholder:text-[#98989D] outline-none transition-all duration-300 shadow-sm ${
+              className={`w-full px-4 py-4 bg-white dark:bg-[#1C1C1E] border rounded-2xl text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7] font-mono tracking-widest placeholder:text-[#6E6E73] dark:placeholder:text-[#98989D] outline-none transition-all duration-300 shadow-sm ${
                 data.gstin.length === 15
                   ? gstinValid
                     ? 'border-[#34C759] focus:ring-4 focus:ring-[#34C759]/20'
@@ -77,11 +77,11 @@ export default function StepGST({ data, updateData, onNext, onBack }: Props) {
             />
             {data.gstin.length === 15 && (
               <p className={`text-[13px] font-semibold mt-3 ml-1 ${gstinValid ? 'text-[#34C759]' : 'text-[#FF3B30] dark:text-[#FF453A]'}`}>
-                {gstinValid ? '✓ Valid GSTIN format' : '⚠️ Invalid format — 15 characters, e.g. 27AABCU9603R1ZX'}
+                {gstinValid ? '✓ Valid GSTIN format' : '⚠️ Invalid format - 15 characters, e.g. 27AABCU9603R1ZX'}
               </p>
             )}
             {data.gstin.length > 0 && data.gstin.length < 15 && (
-              <p className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D] mt-3 ml-1">
+              <p className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-3 ml-1">
                 Format: 2 digits + 10 char PAN + 1 entity + Z + 1 checksum
               </p>
             )}

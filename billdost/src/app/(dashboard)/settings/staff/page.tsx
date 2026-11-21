@@ -40,6 +40,14 @@ export default function StaffPage() {
     onError: (err) => toast.error(err.message)
   })
 
+  const reactivateMutation = trpc.staff.reactivate.useMutation({
+    onSuccess: () => {
+      toast.success('Staff member reactivated')
+      utils.staff.list.invalidate()
+    },
+    onError: (err) => toast.error(err.message)
+  })
+
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault()
     if (!email) return toast.error('Email is required')
@@ -52,45 +60,45 @@ export default function StaffPage() {
         <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
           Staff & Roles
         </h1>
-        <p className="text-sm text-gray-400 dark:text-[#5C5A56] mt-0.5">
+        <p className="text-sm text-gray-400 dark:text-[#98989D] mt-0.5">
           Manage who has access to your shop and what they can do.
         </p>
       </div>
 
       {/* Invite Form */}
-      <form onSubmit={handleInvite} className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-6 rounded-3xl ios-shadow">
+      <form onSubmit={handleInvite} className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-6 rounded-3xl ios-shadow">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <UserPlus className="w-5 h-5 text-blue-500" /> Invite Staff
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-xs font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-2">Name</label>
+            <label className="block text-xs font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-2">Name</label>
             <input 
               type="text" 
               placeholder="e.g. Rahul"
               value={name}
               onChange={e => setName(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-[#1E1C1A] border border-gray-100 dark:border-[#2E2C28] text-gray-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B7A4A]/20 transition-all"
+              className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-100 dark:border-[#38383A] text-gray-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B7A4A]/20 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-2">Email *</label>
+            <label className="block text-xs font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-2">Email *</label>
             <input 
               type="email" 
               required
               placeholder="rahul@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-[#1E1C1A] border border-gray-100 dark:border-[#2E2C28] text-gray-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B7A4A]/20 transition-all"
+              className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-100 dark:border-[#38383A] text-gray-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B7A4A]/20 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-2">Role</label>
+            <label className="block text-xs font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-2">Role</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as 'manager' | 'cashier')}
-              className="w-full bg-gray-50 dark:bg-[#1E1C1A] border border-gray-100 dark:border-[#2E2C28] text-gray-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B7A4A]/20 transition-all appearance-none"
+              className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-100 dark:border-[#38383A] text-gray-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B7A4A]/20 transition-all appearance-none"
             >
               <option value="cashier">Cashier (Billing Only)</option>
               <option value="manager">Manager (Billing + Analytics + Inventory)</option>
@@ -108,9 +116,9 @@ export default function StaffPage() {
       </form>
 
       {/* Staff List */}
-      <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-3xl ios-shadow overflow-hidden">
-        <div className="p-6 border-b border-gray-100 dark:border-[#2E2C28]">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Active Staff</h2>
+      <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-3xl ios-shadow overflow-hidden">
+        <div className="p-6 border-b border-gray-100 dark:border-[#38383A]">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Team Members</h2>
         </div>
         
         {isLoading ? (
@@ -118,23 +126,37 @@ export default function StaffPage() {
         ) : staffList?.length === 0 ? (
           <div className="p-10 text-center text-gray-400">No staff members yet.</div>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-[#2E2C28]">
+          <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
             {staffList?.map((staff) => (
               <div key={staff.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-[#1E1C1A] flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-[#2C2C2E] flex items-center justify-center">
                     {staff.role === 'manager' ? <Shield className="w-6 h-6 text-orange-500" /> : <User className="w-6 h-6 text-blue-500" />}
                   </div>
                   <div>
                     <div className="font-bold text-gray-900 dark:text-white">
-                      {staff.name || 'Unnamed Staff'} 
+                      {staff.name || 'Unnamed Staff'}
                       {staff.status === 'invited' && <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">Pending Invite</span>}
+                      {staff.status === 'active' && <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Active</span>}
+                      {staff.status === 'disabled' && <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">Disabled</span>}
                     </div>
-                    <div className="text-sm text-gray-500 dark:text-[#9A9690]">{staff.email}</div>
+                    <div className="text-sm text-gray-500 dark:text-[#98989D]">{staff.email}</div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4">
+                  {staff.role === 'owner' ? (
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Owner</span>
+                  ) : staff.status === 'disabled' ? (
+                    <button
+                      onClick={() => reactivateMutation.mutate({ id: staff.id })}
+                      disabled={reactivateMutation.isPending}
+                      className="px-3 py-1.5 text-sm font-bold text-[#1B7A4A] bg-[#1B7A4A]/10 hover:bg-[#1B7A4A]/20 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Reactivate
+                    </button>
+                  ) : (
+                  <>
                   <select
                     value={staff.role}
                     onChange={(e) => updateRoleMutation.mutate({ id: staff.id, role: e.target.value as 'manager'|'cashier' })}
@@ -145,7 +167,7 @@ export default function StaffPage() {
                     <option value="manager">Manager</option>
                   </select>
 
-                  <button 
+                  <button
                     onClick={() => {
                       toast('Confirm Removal', {
                         description: 'Are you sure you want to remove this staff member?',
@@ -157,11 +179,14 @@ export default function StaffPage() {
                       })
                     }}
                     disabled={removeMutation.isPending}
-                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
+                    aria-label={`${staff.name || staff.email} ko team se hatao`}
+                    className="tap p-2 min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
                     title="Remove Staff"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-5 h-5" aria-hidden="true" />
                   </button>
+                  </>
+                  )}
                 </div>
               </div>
             ))}

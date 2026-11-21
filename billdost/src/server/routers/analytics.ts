@@ -6,7 +6,7 @@ import { requireManagerOrOwner } from '../utils/auth'
 
 export const analyticsRouter = router({
   /**
-   * overview — powers the 4 dashboard stat cards:
+   * overview - powers the 4 dashboard stat cards:
    *   • Today's revenue
    *   • Pending amount
    *   • Bills sent today
@@ -75,21 +75,29 @@ export const analyticsRouter = router({
   }),
 
   /**
-   * weeklyRevenue — 7 data points (Mon → Sun) for the mini bar chart
+   * weeklyRevenue - 7 data points (Mon → Sun) for the mini bar chart
    */
   weeklyRevenue: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
     const shop = await requireManagerOrOwner(supabase, user.id)
 
-    // Build last 7 days
+    // Build last 7 days for the chart, plus the 7 before them so the
+    // dashboard can show a REAL growth figure (this period vs the
+    // previous one) instead of a decorative number.
     const days: string[] = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date()
       d.setDate(d.getDate() - i)
       days.push(d.toISOString().split('T')[0])
     }
+    const prevDays: string[] = []
+    for (let i = 13; i >= 7; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      prevDays.push(d.toISOString().split('T')[0])
+    }
 
-    const startDate = days[0]
+    const startDate = prevDays[0]
 
     const { data: invoices } = await supabase
       .from('invoices')
@@ -100,7 +108,7 @@ export const analyticsRouter = router({
 
     // Group by date
     const revenueByDay: Record<string, number> = {}
-    days.forEach((d) => (revenueByDay[d] = 0))
+    ;[...prevDays, ...days].forEach((d) => (revenueByDay[d] = 0))
     ;(invoices ?? []).forEach((inv) => {
       const d = inv.invoice_date
       if (d in revenueByDay) {
@@ -108,23 +116,28 @@ export const analyticsRouter = router({
       }
     })
 
+    const prevWeekTotal = prevDays.reduce((acc, d) => acc + (revenueByDay[d] || 0), 0)
+
     const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     const todayDow = new Date().getDay() // 0 = Sun
 
-    return days.map((dateStr, idx) => {
-      const d = new Date(dateStr)
-      const dow = d.getDay()
-      return {
-        date: dateStr,
-        label: DAY_LABELS[dow === 0 ? 6 : dow - 1],
-        revenue: revenueByDay[dateStr],
-        isToday: idx === 6,
-      }
-    })
+    return {
+      days: days.map((dateStr, idx) => {
+        const d = new Date(dateStr)
+        const dow = d.getDay()
+        return {
+          date: dateStr,
+          label: DAY_LABELS[dow === 0 ? 6 : dow - 1],
+          revenue: revenueByDay[dateStr],
+          isToday: idx === 6,
+        }
+      }),
+      prevWeekTotal,
+    }
   }),
 
   /**
-   * recentInvoices — last 5 invoices for the dashboard table
+   * recentInvoices - last 5 invoices for the dashboard table
    */
   recentInvoices: protectedProcedure
     .input(z.object({ limit: z.number().min(1).max(20).default(5) }).optional())
@@ -132,18 +145,16 @@ export const analyticsRouter = router({
       const { supabase, user } = ctx
       const limit = input?.limit ?? 5
 
-      const { data: shop } = await supabase
-        .from('shops')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (!shop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Shop not found' })
+      // Same resolver as every other procedure (blueprint C12): the old
+      // owner-only lookup threw NOT_FOUND for every manager and cashier,
+      // and the select carried the never-written wa_status column.
+      // Delivery status now lives in whatsapp_sends, not on the invoice.
+      const shop = await requireManagerOrOwner(supabase, user.id)
 
       const { data: invoices } = await supabase
         .from('invoices')
         .select(
-          'id, invoice_number, customer_name, customer_phone, total, amount_paid, balance_due, payment_status, invoice_date, wa_status'
+          'id, invoice_number, customer_name, customer_phone, total, amount_paid, balance_due, payment_status, invoice_date'
         )
         .eq('shop_id', shop.id)
         .order('created_at', { ascending: false })
@@ -153,7 +164,7 @@ export const analyticsRouter = router({
     }),
 
   /**
-   * recentActivity — last N activity log entries
+   * recentActivity - last N activity log entries
    */
   recentActivity: protectedProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
@@ -174,7 +185,7 @@ export const analyticsRouter = router({
     }),
 
   /**
-   * revenueTrends — Monthly revenue for the last 6 months
+   * revenueTrends - Monthly revenue for the last 6 months
    */
   revenueTrends: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
@@ -217,7 +228,7 @@ export const analyticsRouter = router({
   }),
 
   /**
-   * topProducts — Returns top 10 products by quantity sold
+   * topProducts - Returns top 10 products by quantity sold
    */
   topProducts: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
@@ -255,7 +266,7 @@ export const analyticsRouter = router({
   }),
 
   /**
-   * topCustomers — Returns top 5 customers by revenue
+   * topCustomers - Returns top 5 customers by revenue
    */
   topCustomers: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
@@ -272,7 +283,7 @@ export const analyticsRouter = router({
   }),
 
   /**
-   * predictProductSales — Mathematical prediction model (SMA + Linear Trend)
+   * predictProductSales - Mathematical prediction model (SMA + Linear Trend)
    */
   predictProductSales: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
@@ -328,5 +339,49 @@ export const analyticsRouter = router({
     })
 
     return calculateForecast(prodStats)
+  }),
+
+  /**
+   * Monthly cash snapshot (blueprint D11): money actually received
+   * this month from the payments ledger minus this month's active
+   * expenses. Labelled a cash view everywhere it is shown: it is not
+   * accrual profit (credit sales count when paid, stock purchases
+   * are not in expenses unless the shop records them).
+   */
+  monthlyProfit: protectedProcedure.query(async ({ ctx }) => {
+    const { supabase, user } = ctx
+    const shop = await requireManagerOrOwner(supabase, user.id)
+
+    const now = new Date()
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+    const monthStartIso = monthStart.toISOString()
+    const monthStartDate = monthStartIso.split('T')[0]
+
+    const [{ data: payments, error: payErr }, { data: expenses, error: expErr }] =
+      await Promise.all([
+        supabase
+          .from('payments')
+          .select('amount')
+          .eq('shop_id', shop.id)
+          .gte('created_at', monthStartIso),
+        supabase
+          .from('expenses')
+          .select('amount')
+          .eq('shop_id', shop.id)
+          .eq('status', 'active')
+          .gte('expense_date', monthStartDate),
+      ])
+    if (payErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: payErr.message })
+    if (expErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: expErr.message })
+
+    const received = (payments || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
+    const spent = (expenses || []).reduce((s: number, e: any) => s + Number(e.amount || 0), 0)
+    return {
+      month: monthStartDate.slice(0, 7),
+      received,
+      expenses: spent,
+      net: received - spent,
+      basis: 'cash' as const,
+    }
   })
 })

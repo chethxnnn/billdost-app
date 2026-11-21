@@ -15,9 +15,11 @@ interface Product {
 
 interface Props {
   onAddProduct: (product: Product) => void
+  /** POS counter mode: bigger tiles and type for gloved, hurried taps. */
+  large?: boolean
 }
 
-export function QuickAddGrid({ onAddProduct }: Props) {
+export function QuickAddGrid({ onAddProduct, large = false }: Props) {
   const { data: products, isLoading } = trpc.products.list.useQuery({ active: true })
   const [activeCategory, setActiveCategory] = useState<string>('All')
   const [search, setSearch] = useState('')
@@ -49,10 +51,10 @@ export function QuickAddGrid({ onAddProduct }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[#161513] rounded-3xl border border-gray-100 dark:border-[#2E2C28] overflow-hidden shadow-sm">
+    <div className="flex flex-col h-full bg-white dark:bg-[#1C1C1E] rounded-3xl border border-gray-100 dark:border-[#38383A] overflow-hidden shadow-sm">
       
       {/* Header & Search */}
-      <div className="p-4 border-b border-gray-100 dark:border-[#2E2C28] space-y-4 bg-gray-50/50 dark:bg-white/5">
+      <div className="p-4 border-b border-gray-100 dark:border-[#38383A] space-y-4 bg-gray-50/50 dark:bg-white/5">
         <div className="flex items-center justify-between">
           <h2 className="font-extrabold text-[16px] text-gray-900 dark:text-white flex items-center gap-2">
             <span>⚡️</span> Quick Add
@@ -66,13 +68,13 @@ export function QuickAddGrid({ onAddProduct }: Props) {
             placeholder="Search items..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm font-medium outline-none focus:border-[#1B7A4A] transition-all placeholder:font-normal"
+            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm font-medium outline-none focus:border-[#1B7A4A] transition-all placeholder:font-normal"
           />
         </div>
       </div>
 
       {/* Category Tabs (Horizontal Scroll) */}
-      <div className="w-full overflow-x-auto no-scrollbar border-b border-gray-100 dark:border-[#2E2C28]">
+      <div className="w-full overflow-x-auto no-scrollbar border-b border-gray-100 dark:border-[#38383A]">
         <div className="flex gap-2 p-3 w-max">
           {categories.map(cat => (
             <button
@@ -101,7 +103,7 @@ export function QuickAddGrid({ onAddProduct }: Props) {
               <p className="text-gray-400 text-sm font-medium">No items found.</p>
             </motion.div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className={`grid grid-cols-2 lg:grid-cols-3 ${large ? 'gap-4' : 'gap-3'}`}>
               {filteredProducts.map(product => (
                 <motion.button
                   layout
@@ -110,17 +112,17 @@ export function QuickAddGrid({ onAddProduct }: Props) {
                   exit={{ opacity: 0, scale: 0.9 }}
                   key={product.id}
                   onClick={() => onAddProduct(product as any)}
-                  className="flex flex-col items-start p-3 bg-gray-50 dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#2E2C28] rounded-2xl hover:border-[#1B7A4A] hover:shadow-md hover:shadow-[#1B7A4A]/10 transition-all active:scale-95 text-left group"
+                  className={`flex flex-col items-start bg-gray-50 dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl hover:border-[#1B7A4A] hover:shadow-md hover:shadow-[#1B7A4A]/10 transition-all active:scale-95 text-left group ${large ? 'p-4 min-h-[104px]' : 'p-3'}`}
                 >
                   <div className="w-full flex items-start justify-between mb-2">
-                    <div className="w-8 h-8 rounded-full bg-white dark:bg-[#2C2C2E] flex items-center justify-center text-[15px] shadow-sm font-bold text-gray-700 dark:text-gray-200">
+                    <div className={`rounded-full bg-white dark:bg-[#2C2C2E] flex items-center justify-center shadow-sm font-bold text-gray-700 dark:text-gray-200 ${large ? 'w-10 h-10 text-[17px]' : 'w-8 h-8 text-[15px]'}`}>
                       {product.name.charAt(0).toUpperCase()}
                     </div>
                   </div>
-                  <h3 className="font-bold text-[13px] text-gray-900 dark:text-white leading-tight line-clamp-2">
+                  <h3 className={`font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 ${large ? 'text-[15px]' : 'text-[13px]'}`}>
                     {product.name}
                   </h3>
-                  <p className="text-[#1B7A4A] dark:text-[#25D366] font-extrabold text-[14px] mt-1">
+                  <p className={`text-[#1B7A4A] dark:text-[#25D366] font-extrabold mt-1 ${large ? 'text-[16px]' : 'text-[14px]'}`}>
                     ₹{product.price}
                   </p>
                 </motion.button>

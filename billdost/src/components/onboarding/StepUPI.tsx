@@ -2,7 +2,7 @@
 
 import { useRef } from 'react'
 import { toast } from 'sonner'
-import type { OnboardingData } from '@/app/(auth)/onboarding/page'
+import type { OnboardingData } from '@/components/onboarding/types'
 
 interface Props {
   data: OnboardingData
@@ -30,7 +30,7 @@ export default function StepUPI({ data, updateData, onNext, onBack }: Props) {
         <h1 className="text-[28px] md:text-[32px] font-extrabold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight mb-3 leading-tight">
           Setup Payments
         </h1>
-        <p className="text-[15px] text-[#86868B] dark:text-[#98989D] font-medium max-w-sm mx-auto">
+        <p className="text-[15px] text-[#6E6E73] dark:text-[#98989D] font-medium max-w-sm mx-auto">
           Add your UPI ID or QR code to let customers pay directly from the invoice.
         </p>
       </div>
@@ -46,10 +46,10 @@ export default function StepUPI({ data, updateData, onNext, onBack }: Props) {
             value={data.upiId}
             onChange={(e) => updateData({ upiId: e.target.value.trim() })}
             placeholder="yourname@upi"
-            className="w-full px-4 py-4 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#86868B] dark:placeholder:text-[#98989D] outline-none focus:border-[#34C759] focus:ring-4 focus:ring-[#34C759]/10 transition-all duration-300 shadow-sm"
+            className="w-full px-4 py-4 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[16px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#6E6E73] dark:placeholder:text-[#98989D] outline-none focus:border-[#34C759] focus:ring-4 focus:ring-[#34C759]/10 transition-all duration-300 shadow-sm"
           />
-          <p className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D] mt-2 ml-1">
-            GPay, PhonePe, Paytm, BHIM — any UPI ID works.
+          <p className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-2 ml-1">
+            GPay, PhonePe, Paytm, BHIM - any UPI ID works.
           </p>
         </div>
 
@@ -59,7 +59,7 @@ export default function StepUPI({ data, updateData, onNext, onBack }: Props) {
             <label className="block text-[13px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] uppercase tracking-wider">
               UPI QR Code
             </label>
-            <span className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D]">Optional</span>
+            <span className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D]">Optional</span>
           </div>
           <div
             onClick={() => fileRef.current?.click()}
@@ -76,7 +76,7 @@ export default function StepUPI({ data, updateData, onNext, onBack }: Props) {
                   <span className="text-3xl">📷</span>
                 </div>
                 <p className="text-[15px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Upload QR Code image</p>
-                <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D] mt-1">Screenshot or saved QR from your payment app</p>
+                <p className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-1">Screenshot or saved QR from your payment app</p>
               </div>
             )}
           </div>
@@ -91,7 +91,7 @@ export default function StepUPI({ data, updateData, onNext, onBack }: Props) {
           <div className="flex items-center justify-between">
             <div>
               <div className="font-bold text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7]">Show QR on invoices?</div>
-              <div className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D] mt-1">Customers can scan to pay instantly</div>
+              <div className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-1">Customers can scan to pay instantly</div>
             </div>
             
             <div

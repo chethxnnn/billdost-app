@@ -15,22 +15,9 @@ import StepAdmin from '@/components/onboarding/StepAdmin'
 import StepComplete from '@/components/onboarding/StepComplete'
 import AnimatedOnboardingProcess from '@/components/onboarding/AnimatedOnboardingProcess'
 
-export interface OnboardingData {
-  shopName: string
-  logoFile: File | null
-  logoPreview: string
-  category: string
-  hasGST: boolean
-  gstin: string
-  products: Array<{ name: string; price: number; unit: string; category: string }>
-  upiId: string
-  upiQrFile: File | null
-  upiQrPreview: string
-  includeUpiQr: boolean
-  language: string
-  pin: string
-  staffMembers: Array<{ name: string; phone: string; role: string }>
-}
+import type { OnboardingData } from '@/components/onboarding/types'
+import { TRPCProvider } from '@/components/shared/TRPCProvider'
+import { trpc } from '@/lib/trpc/client'
 
 const INITIAL_DATA: OnboardingData = {
   shopName: '',
@@ -45,7 +32,6 @@ const INITIAL_DATA: OnboardingData = {
   upiQrPreview: '',
   includeUpiQr: true,
   language: 'hinglish',
-  pin: '',
   staffMembers: [],
 }
 
@@ -60,12 +46,13 @@ const STEPS = [
   { id: 'complete', label: 'Done', icon: '🎉' },
 ]
 
-export default function OnboardingPage() {
+function OnboardingWizard() {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState(1) // 1 for forwards, -1 for backwards
   const [data, setData] = useState<OnboardingData>(INITIAL_DATA)
   const [saving, setSaving] = useState(false)
+  const completeMut = trpc.onboarding.completeOnboarding.useMutation()
 
   const updateData = useCallback((updates: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...updates }))
@@ -116,88 +103,43 @@ export default function OnboardingPage() {
         }
       }
 
-      // 3. Create shop
-      const slug = data.shopName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '') + '-' + Date.now().toString(36)
-
-      const { data: shop, error: shopError } = await supabase
-        .from('shops')
-        .insert({
-          owner_id: user.id,
-          name: data.shopName,
-          slug,
-          category: data.category || 'other',
-          logo_url: logoUrl || null,
-          phone: user.user_metadata?.phone || '',
-          email: user.email || '',
-          gstin: data.hasGST ? data.gstin : null,
-          upi_id: data.upiId || null,
-          upi_qr_url: upiQrUrl || null,
-          include_upi_qr_default: data.includeUpiQr,
-          language: data.language,
-          onboarding_done: true,
-        })
-        .select()
-        .single()
-
-      if (shopError) throw shopError
-
-      // 4. Create admin staff entry
-      if (shop) {
-        await supabase.from('staff').insert({
-          shop_id: shop.id,
-          user_id: user.id,
-          name: user.user_metadata?.full_name || data.shopName,
-          phone: user.user_metadata?.phone || '',
-          role: 'admin',
-          pin: data.pin || null,
-          is_active: true,
-          joined_at: new Date().toISOString(),
-        })
-
-        // 5. Insert products
-        if (data.products.length > 0) {
-          const productRows = data.products.map((p, i) => ({
-            shop_id: shop.id,
-            name: p.name,
-            price: p.price,
-            unit: p.unit,
-            category: p.category,
-            sort_order: i,
-            is_active: true,
-          }))
-          await supabase.from('products').insert(productRows)
-        }
-
-        // 6. Insert additional staff
-        if (data.staffMembers.length > 0) {
-          const staffRows = data.staffMembers.map((s) => ({
-            shop_id: shop.id,
-            name: s.name,
-            phone: s.phone,
-            role: s.role,
-            is_active: true,
-          }))
-          await supabase.from('staff').insert(staffRows)
-        }
-
-        // 7. Log activity
-        await supabase.from('activity_log').insert({
-          shop_id: shop.id,
-          type: 'shop_created',
-          entity_type: 'shop',
-          entity_id: shop.id,
-          summary: `${data.shopName} ka BillDost account ban gaya! 🎉`,
-        })
-      }
+      // 3. One server mutation does the rest (blueprint C13): shop,
+      // owner staff row, invited staff, starter products and the
+      // activity log are created by complete_onboarding_tx in a
+      // single transaction. The old flow ran four separate browser
+      // inserts; a failure halfway left a broken shop, and the
+      // invited-staff insert failed silently on every run because
+      // staff_members.email was NOT NULL and the wizard collects
+      // phone only.
+      await completeMut.mutateAsync({
+        shop_name: data.shopName,
+        category: data.category || 'other',
+        gstin: data.hasGST ? data.gstin : null,
+        upi_id: data.upiId || null,
+        upi_qr_url: upiQrUrl || null,
+        logo_url: logoUrl || null,
+        include_upi_qr: data.includeUpiQr,
+        language: (['hinglish', 'en', 'hi', 'kn'].includes(data.language)
+          ? data.language
+          : 'hinglish') as 'hinglish' | 'en' | 'hi' | 'kn',
+        products: data.products.map((p) => ({
+          name: p.name,
+          price: p.price,
+          unit: p.unit,
+          category: p.category || null,
+        })),
+        staff: data.staffMembers.map((s) => ({
+          name: s.name,
+          phone: s.phone,
+          role: s.role,
+        })),
+      })
 
       router.push('/dashboard')
       router.refresh()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Onboarding save failed:', err)
-      toast.error('Kuch gadbad ho gayi. Dobara try karo.')
+      toast.error(err?.message || 'Kuch gadbad ho gayi. Dobara try karo.')
     } finally {
       setSaving(false)
     }
@@ -226,7 +168,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen lg:h-screen bg-[#FAFAFA] dark:bg-[#09090B] flex flex-col lg:flex-row w-full overflow-hidden">
+    <div className="min-h-screen lg:h-screen bg-[#F5F5F7] dark:bg-[#000000] flex flex-col lg:flex-row w-full overflow-hidden">
       
       {/* LEFT PANEL: Branding (Desktop Only) */}
       <div className="hidden lg:flex lg:w-[30%] bg-gradient-to-br from-[#1B7A4A] to-[#0A4A28] dark:from-[#0B3A20] dark:to-[#041F10] p-12 flex-col justify-between relative overflow-hidden shadow-2xl z-10">
@@ -286,7 +228,7 @@ export default function OnboardingPage() {
           {/* Progress Section */}
           <div className="w-full mb-3 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-[12px] font-bold text-[#86868B] dark:text-[#98989D] uppercase tracking-wider">
+              <span className="text-[12px] font-bold text-[#6E6E73] dark:text-[#98989D] uppercase tracking-wider">
                 Step {step + 1} of {STEPS.length}
               </span>
               <span className="text-[12px] font-bold text-[#1B7A4A] dark:text-[#25D366]">
@@ -348,5 +290,18 @@ export default function OnboardingPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * The wizard now completes through a tRPC mutation, so the page needs
+ * the provider the dashboard shell normally supplies (onboarding lives
+ * outside the (dashboard) route group).
+ */
+export default function OnboardingPage() {
+  return (
+    <TRPCProvider>
+      <OnboardingWizard />
+    </TRPCProvider>
   )
 }

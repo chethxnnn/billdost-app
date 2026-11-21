@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 import { requireShopAccess, requireManagerOrOwner } from '../utils/auth'
+import { mapRpcError } from '../utils/rpcErrors'
 
 /* ─── Shared schema ─── */
 const productInput = z.object({
@@ -15,12 +16,44 @@ const productInput = z.object({
   tax_rate:        z.number().min(0).max(100).default(0),
   stock_qty:       z.number().min(0).optional().nullable(),
   low_stock_alert: z.number().min(0).optional().nullable(),
+  barcode:         z.string().max(50).optional().nullable(),
+  sku:             z.string().max(50).optional().nullable(),
+  track_expiry:    z.boolean().default(false),
   is_active:       z.boolean().default(true),
 })
 
+/**
+ * Barcode uniqueness is per shop (partial unique index in migration
+ * 0004). Checked in the router first so the shopkeeper gets a friendly
+ * message naming the product that already owns the code, with the
+ * index as the backstop against races.
+ */
+async function assertBarcodeFree(
+  supabase: any,
+  shopId: string,
+  barcode: string | null | undefined,
+  excludeId?: string
+) {
+  const code = barcode?.trim()
+  if (!code) return
+  let query = supabase
+    .from('products')
+    .select('id, name')
+    .eq('shop_id', shopId)
+    .eq('barcode', code)
+  if (excludeId) query = query.neq('id', excludeId)
+  const { data: existing } = await query.limit(1).single()
+  if (existing) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: `Ye barcode pehle se "${existing.name}" par laga hai.`,
+    })
+  }
+}
+
 export const productsRouter = router({
   /* ─────────────────────────────────────────
-     LIST  — all products for the shop
+     LIST  - all products for the shop
      Supports optional ?search and ?category
   ───────────────────────────────────────── */
   list: protectedProcedure
@@ -61,7 +94,7 @@ export const productsRouter = router({
     }),
 
   /* ─────────────────────────────────────────
-     GET CATEGORIES — distinct category list
+     GET CATEGORIES - distinct category list
   ───────────────────────────────────────── */
   categories: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
@@ -86,6 +119,8 @@ export const productsRouter = router({
       const { supabase, user } = ctx
       const shop = await requireManagerOrOwner(supabase, user.id)
 
+      await assertBarcodeFree(supabase, shop.id, input.barcode)
+
       // Get current max sort_order
       const { data: last } = await supabase
         .from('products')
@@ -103,7 +138,12 @@ export const productsRouter = router({
         .select()
         .single()
 
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      if (error) {
+        if (error.code === '23505') {
+          throw new TRPCError({ code: 'CONFLICT', message: 'Ye barcode ya SKU pehle se kisi product par laga hai.' })
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      }
 
       // Log activity
       await supabase.from('activity_log').insert({
@@ -175,6 +215,8 @@ export const productsRouter = router({
       const shop = await requireManagerOrOwner(supabase, user.id)
       const { id, ...fields } = input
 
+      await assertBarcodeFree(supabase, shop.id, fields.barcode, id)
+
       const { data, error } = await supabase
         .from('products')
         .update({ ...fields, updated_at: new Date().toISOString() })
@@ -207,7 +249,7 @@ export const productsRouter = router({
     }),
 
   /* ─────────────────────────────────────────
-     HARD DELETE — permanent removal
+     HARD DELETE - permanent removal
   ───────────────────────────────────────── */
   hardDelete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -226,12 +268,15 @@ export const productsRouter = router({
     }),
 
   /* ─────────────────────────────────────────
-     UPDATE STOCK — adjust stock quantity and log it
+     UPDATE STOCK - sets an absolute quantity via adjust_stock_tx,
+     which locks the product row, writes the new quantity and the
+     inventory ledger row in one transaction (blueprint B.6). The
+     input qty is the NEW total, as the StockAdjustModal computes it.
   ───────────────────────────────────────── */
   updateStock: protectedProcedure
-    .input(z.object({ 
-      id: z.string().uuid(), 
-      qty: z.number(),
+    .input(z.object({
+      id: z.string().uuid(),
+      qty: z.number().min(0),
       notes: z.string().optional(),
       type: z.enum(['STOCK_IN', 'STOCK_OUT', 'AUDIT']).default('AUDIT')
     }))
@@ -239,45 +284,52 @@ export const productsRouter = router({
       const { supabase, user } = ctx
       const shop = await requireManagerOrOwner(supabase, user.id)
 
-      // Get current stock first
-      const { data: currentProduct, error: fetchErr } = await supabase
+      const { error } = await supabase.rpc('adjust_stock_tx', {
+        p_product_id: input.id,
+        p_new_qty: input.qty,
+        p_type: input.type,
+        p_note: input.notes || 'Manual adjustment via dashboard',
+        p_actor: user.id,
+      })
+
+      if (error) throw mapRpcError(error)
+
+      const { data, error: fetchErr } = await supabase
         .from('products')
-        .select('stock_qty')
+        .select('*')
         .eq('id', input.id)
         .eq('shop_id', shop.id)
         .single()
 
-      if (fetchErr) throw new TRPCError({ code: 'NOT_FOUND', message: 'Product not found' })
+      if (fetchErr || !data) throw new TRPCError({ code: 'NOT_FOUND', message: 'Product not found' })
+      return data
+    }),
 
-      const prevStock = currentProduct.stock_qty || 0
-      const newStock = input.qty
-      const change = newStock - prevStock
+  /* ─────────────────────────────────────────
+     GET BY BARCODE (blueprint D2): exact match, shop-scoped. Used by
+     scan-to-add in billing and by the catalog scan lookup. Returns
+     null (not an error) for an unknown code so the UI can offer
+     "create product with this barcode" inline.
+  ───────────────────────────────────────── */
+  getByBarcode: protectedProcedure
+    .input(z.object({ barcode: z.string().min(1).max(50) }))
+    .query(async ({ ctx, input }) => {
+      const { supabase, user } = ctx
+      const shop = await requireShopAccess(supabase, user.id)
 
-      // Update stock
       const { data, error } = await supabase
         .from('products')
-        .update({ stock_qty: newStock, updated_at: new Date().toISOString() })
-        .eq('id', input.id)
+        .select('*')
         .eq('shop_id', shop.id)
-        .select()
+        .eq('barcode', input.barcode.trim())
+        .eq('is_active', true)
+        .limit(1)
         .single()
 
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
-
-      // Write to inventory ledger
-      if (change !== 0) {
-        await supabase.from('inventory_logs').insert({
-          shop_id: shop.id,
-          product_id: input.id,
-          type: input.type,
-          quantity_change: change,
-          previous_stock: prevStock,
-          new_stock: newStock,
-          notes: input.notes || 'Manual adjustment via dashboard',
-          created_by: user.id
-        })
+      if (error) {
+        if (error.code === 'PGRST116') return null
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       }
-
       return data
     }),
 
@@ -338,7 +390,7 @@ export const productsRouter = router({
     }),
 
   /* ─────────────────────────────────────────
-     LOW STOCK — items below alert threshold
+     LOW STOCK - items below alert threshold
   ───────────────────────────────────────── */
   lowStock: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
@@ -357,4 +409,127 @@ export const productsRouter = router({
       (p: any) => Number(p.stock_qty) <= Number(p.low_stock_alert)
     )
   }),
+
+  // ---------------------------------------------------------- batches
+  // Batch and expiry management (blueprint D5). Stock changes go
+  // through the migration 0015 RPCs so product stock, batch qty and
+  // the inventory log move together; plain reads are direct selects.
+  // FEFO deduction at billing time is NOT wired yet: see
+  // docs/fefo-batch-allocation.md for the exact Stage 5 change.
+
+  listBatches: protectedProcedure
+    .input(z.object({ product_id: z.string().uuid().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const { supabase, user } = ctx
+      const shop = await requireManagerOrOwner(supabase, user.id)
+
+      let query = supabase
+        .from('product_batches')
+        .select('id, product_id, batch_no, expiry_date, mfg_date, qty, cost_price, mrp, created_at, products(name)')
+        .eq('shop_id', shop.id)
+        .order('expiry_date', { ascending: true, nullsFirst: false })
+      if (input?.product_id) query = query.eq('product_id', input.product_id)
+
+      const { data, error } = await query
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      return (data || []).map((b: any) => ({
+        id: b.id,
+        product_id: b.product_id,
+        product_name: b.products?.name || null,
+        batch_no: b.batch_no,
+        expiry_date: b.expiry_date,
+        mfg_date: b.mfg_date,
+        qty: Number(b.qty) || 0,
+        cost_price: b.cost_price === null ? null : Number(b.cost_price),
+        mrp: b.mrp === null ? null : Number(b.mrp),
+        created_at: b.created_at,
+      }))
+    }),
+
+  expiringSoon: protectedProcedure.query(async ({ ctx }) => {
+    const { supabase, user } = ctx
+    const shop = await requireManagerOrOwner(supabase, user.id)
+
+    const { data, error } = await supabase
+      .from('product_batches')
+      .select('id, product_id, batch_no, expiry_date, qty, products(name)')
+      .eq('shop_id', shop.id)
+      .gt('qty', 0)
+      .not('expiry_date', 'is', null)
+      .order('expiry_date', { ascending: true })
+    if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const rows = (data || []).map((b: any) => {
+      const expiry = new Date(`${b.expiry_date}T00:00:00`)
+      const daysLeft = Math.floor((expiry.getTime() - today.getTime()) / 86_400_000)
+      return {
+        id: b.id,
+        product_id: b.product_id,
+        product_name: b.products?.name || null,
+        batch_no: b.batch_no,
+        expiry_date: b.expiry_date,
+        qty: Number(b.qty) || 0,
+        days_left: daysLeft,
+      }
+    })
+    return {
+      expired: rows.filter((r) => r.days_left < 0),
+      within7: rows.filter((r) => r.days_left >= 0 && r.days_left <= 7),
+      within30: rows.filter((r) => r.days_left > 7 && r.days_left <= 30),
+    }
+  }),
+
+  addBatch: protectedProcedure
+    .input(
+      z.object({
+        product_id: z.string().uuid(),
+        batch_no: z.string().min(1).max(60),
+        expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+        mrp: z.number().min(0).optional().nullable(),
+        cost_price: z.number().min(0).optional().nullable(),
+        qty: z.number().positive(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { supabase, user } = ctx
+      await requireManagerOrOwner(supabase, user.id)
+
+      const { data, error } = await supabase.rpc('add_product_batch_tx', {
+        p_product_id: input.product_id,
+        p_batch_no: input.batch_no,
+        p_expiry_date: input.expiry_date || null,
+        p_mrp: input.mrp ?? null,
+        p_cost_price: input.cost_price ?? null,
+        p_qty: input.qty,
+        p_actor: user.id,
+      })
+      if (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: error.message || 'Batch add nahi ho paya.',
+        })
+      }
+      return { batch_id: data as string }
+    }),
+
+  writeOffBatch: protectedProcedure
+    .input(z.object({ batch_id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { supabase, user } = ctx
+      await requireManagerOrOwner(supabase, user.id)
+
+      const { error } = await supabase.rpc('write_off_batch_tx', {
+        p_batch_id: input.batch_id,
+        p_actor: user.id,
+      })
+      if (error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: error.message || 'Batch write-off nahi ho paya.',
+        })
+      }
+      return { success: true }
+    }),
 })

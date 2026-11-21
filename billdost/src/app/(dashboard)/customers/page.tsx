@@ -6,6 +6,9 @@ import { useTranslation } from '@/lib/i18n/useTranslation'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import CustomerAnalyticsDrawer from '@/components/customers/CustomerAnalyticsDrawer'
+import { useShop } from '@/components/shared/ShopContext'
+import { normalizePhone } from '@/lib/phone'
+import { INDIAN_STATES, stateCodeForName, stateNameForCode } from '@/lib/indian-states'
 
 /* ─── Types ─── */
 interface Customer {
@@ -16,6 +19,9 @@ interface Customer {
   email?: string | null
   address?: string | null
   notes?: string | null
+  gstin?: string | null
+  state?: string | null
+  state_code?: string | null
   tags?: string[] | null
   total_billed: number
   total_paid: number
@@ -29,7 +35,7 @@ const formatINR = (n: number) =>
 
 const avatarColor = (name: string) => {
   const colors = [
-    ['#0D2E1F', '#2BB673'], ['#1a1a2e', '#4361ee'], ['#2d1b00', '#f48c06'],
+    ['#0D2E1F', '#25D366'], ['#1a1a2e', '#4361ee'], ['#2d1b00', '#f48c06'],
     ['#1a0a0a', '#e63946'], ['#0a1a2d', '#4cc9f0'], ['#1a0d2e', '#7b2d8b'],
   ]
   return colors[name.charCodeAt(0) % colors.length]
@@ -37,7 +43,7 @@ const avatarColor = (name: string) => {
 
 /* ─── Skeleton ─── */
 function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-xl bg-gray-100 dark:bg-[#2E2C28] ${className}`} />
+  return <div className={`animate-pulse rounded-xl bg-gray-100 dark:bg-[#38383A] ${className}`} />
 }
 
 /* ─── Customer Card ─── */
@@ -46,12 +52,16 @@ function CustomerCard({
   onEdit,
   onDelete,
   onViewAnalytics,
+  canDelete = true,
+  outstanding = 0,
   t,
 }: {
   customer: Customer
   onEdit: (c: Customer) => void
   onDelete: (id: string) => void
   onViewAnalytics: (id: string) => void
+  canDelete?: boolean
+  outstanding?: number
   t: any
 }) {
   const [bg, text] = avatarColor(customer.name)
@@ -59,7 +69,7 @@ function CustomerCard({
   return (
     <div 
       onClick={() => onViewAnalytics(customer.id)}
-      className="group bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl p-4 hover:shadow-md dark:hover:border-[#3E3C38] transition-all duration-200 flex flex-col gap-4 cursor-pointer"
+      className="group bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-4 hover:shadow-md dark:hover:border-[#48484A] transition-all duration-200 flex flex-col gap-4 cursor-pointer"
     >
       {/* Top row */}
       <div className="flex items-start gap-3">
@@ -77,28 +87,32 @@ function CustomerCard({
             {customer.name}
           </div>
           {customer.phone && (
-            <div className="text-xs text-gray-500 dark:text-[#9A9690] mt-0.5">
+            <div className="text-xs text-gray-500 dark:text-[#98989D] mt-0.5">
               {customer.phone}
             </div>
           )}
         </div>
 
-        {/* Actions — show on hover */}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Actions: always visible on touch at 44px, hover-reveal on desktop */}
+        <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(customer); }}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-[#1B7A4A] dark:hover:text-[#2BB673] hover:bg-gray-50 dark:hover:bg-[#1E1C1A] transition-colors"
+            aria-label={`${customer.name} edit karo`}
+            className="tap w-11 h-11 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-[#1B7A4A] dark:hover:text-[#25D366] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
             title="Edit"
           >
             <PencilIcon />
           </button>
+          {canDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(customer.id); }}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-[#2E1A10] transition-colors"
+            aria-label={`${customer.name} delete karo`}
+            className="tap w-11 h-11 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-[#2E1A10] transition-colors"
             title="Delete"
           >
             <TrashIcon />
           </button>
+          )}
         </div>
       </div>
 
@@ -106,7 +120,7 @@ function CustomerCard({
       {customer.tags && customer.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {customer.tags.map((t) => (
-            <span key={t} className="px-2 py-0.5 bg-gray-50 dark:bg-[#252320] text-gray-600 dark:text-[#9A9690] rounded-full text-[10px] font-semibold tracking-wide uppercase">
+            <span key={t} className="px-2 py-0.5 bg-gray-50 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#98989D] rounded-full text-[10px] font-semibold tracking-wide uppercase">
               {t}
             </span>
           ))}
@@ -114,9 +128,9 @@ function CustomerCard({
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50 dark:border-[#2E2C28]">
+      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50 dark:border-[#38383A]">
         <div>
-          <div className="text-[10px] font-semibold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-0.5">
+          <div className="text-[10px] font-semibold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-0.5">
             {t('customers', 'total_billed')}
           </div>
           <div className="text-sm font-extrabold text-gray-900 dark:text-white">
@@ -124,7 +138,7 @@ function CustomerCard({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-semibold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-0.5">
+          <div className="text-[10px] font-semibold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-0.5">
             {t('customers', 'bills')}
           </div>
           <div className="text-sm font-extrabold text-gray-900 dark:text-white">
@@ -133,11 +147,23 @@ function CustomerCard({
         </div>
       </div>
 
+      {/* Udhaar outstanding, from the payments ledger (reminders.listDue) */}
+      {outstanding > 0 && (
+        <a
+          href="/udhaar"
+          onClick={(e) => e.stopPropagation()}
+          className="w-full py-2 px-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold flex items-center justify-between transition-colors hover:bg-red-100 dark:hover:bg-red-950/50"
+        >
+          <span>Udhaar Baki</span>
+          <span>{formatINR(outstanding)}</span>
+        </a>
+      )}
+
       {/* WhatsApp Button */}
-      {customer.whatsapp || customer.phone ? (
+      {normalizePhone(customer.whatsapp || customer.phone) ? (
         <a
           onClick={(e) => e.stopPropagation()}
-          href={`https://wa.me/91${(customer.whatsapp || customer.phone)?.replace(/\D/g, '')}`}
+          href={`https://wa.me/${normalizePhone(customer.whatsapp || customer.phone)}`}
           target="_blank"
           rel="noreferrer"
           className="mt-1 w-full py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] dark:text-[#25D366] rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors"
@@ -158,6 +184,8 @@ const DEFAULT_FORM = {
   email: '',
   address: '',
   notes: '',
+  gstin: '',
+  state_code: '',
   tags: [] as string[],
 }
 
@@ -192,6 +220,8 @@ function CustomerDrawer({
         email: customer.email ?? '',
         address: customer.address ?? '',
         notes: customer.notes ?? '',
+        gstin: customer.gstin ?? '',
+        state_code: customer.state_code ?? stateCodeForName(customer.state) ?? '',
         tags: customer.tags ?? [],
       })
     } else {
@@ -239,6 +269,9 @@ function CustomerDrawer({
       email: form.email.trim() || null,
       address: form.address.trim() || null,
       notes: form.notes.trim() || null,
+      gstin: form.gstin.trim().toUpperCase() || null,
+      state: stateNameForCode(form.state_code) || null,
+      state_code: form.state_code || null,
       tags: form.tags,
     }
     if (customer) {
@@ -259,9 +292,9 @@ function CustomerDrawer({
       />
       <div
         ref={drawerRef}
-        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-[#161513] border-l border-gray-100 dark:border-[#2E2C28] z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-[#1C1C1E] border-l border-gray-100 dark:border-[#38383A] z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-[#2E2C28] flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-[#38383A] flex-shrink-0">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               {customer ? t('customers', 'edit_customer') : t('customers', 'add_customer')}
@@ -269,7 +302,7 @@ function CustomerDrawer({
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#252320] transition-colors"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
           >
             <XIcon />
           </button>
@@ -277,43 +310,43 @@ function CustomerDrawer({
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">{t('customers', 'name')} *</label>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">{t('customers', 'name')} *</label>
             <input
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
               placeholder="Raju Bhai..."
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
             />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">{t('customers', 'phone')}</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">{t('customers', 'phone')}</label>
               <input
                 value={form.phone}
                 onChange={(e) => set('phone', e.target.value)}
                 placeholder="98765..."
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">{t('customers', 'whatsapp')}</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">{t('customers', 'whatsapp')}</label>
               <input
                 value={form.whatsapp}
                 onChange={(e) => set('whatsapp', e.target.value)}
                 placeholder="Optional..."
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">{t('customers', 'tags_label')}</label>
-            <div className="p-2 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl focus-within:border-[#1B7A4A] dark:focus-within:border-[#2BB673] transition-colors">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">{t('customers', 'tags_label')}</label>
+            <div className="p-2 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl focus-within:border-[#1B7A4A] dark:focus-within:border-[#25D366] transition-colors">
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {form.tags.map((t) => (
-                  <span key={t} className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-[#252320] border border-gray-200 dark:border-[#3E3C38] rounded-lg text-xs font-medium">
+                  <span key={t} className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#48484A] rounded-lg text-xs font-medium">
                     {t}
                     <button type="button" onClick={() => removeTag(t)} className="text-gray-400 hover:text-red-500"><XIcon className="w-3 h-3" /></button>
                   </span>
@@ -329,23 +362,49 @@ function CustomerDrawer({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">GSTIN (Optional)</label>
+              <input
+                value={form.gstin}
+                onChange={(e) => set('gstin', e.target.value)}
+                placeholder="29ABCDE1234F1Z5"
+                maxLength={15}
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors uppercase"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">State (GST)</label>
+              <select
+                value={form.state_code}
+                onChange={(e) => set('state_code', e.target.value)}
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
+              >
+                <option value="">-- Select --</option>
+                {INDIAN_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">{t('customers', 'address')}</label>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">{t('customers', 'address')}</label>
             <textarea
               value={form.address}
               onChange={(e) => set('address', e.target.value)}
               rows={2}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors resize-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors resize-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">{t('customers', 'notes')}</label>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">{t('customers', 'notes')}</label>
             <textarea
               value={form.notes}
               onChange={(e) => set('notes', e.target.value)}
               rows={2}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors resize-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors resize-none"
             />
           </div>
 
@@ -356,11 +415,11 @@ function CustomerDrawer({
           )}
         </form>
 
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-[#2E2C28] flex gap-3 flex-shrink-0">
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-[#38383A] flex gap-3 flex-shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#2E2C28] text-sm font-medium text-gray-600 dark:text-[#9A9690] hover:bg-gray-50 dark:hover:bg-[#1E1C1A] transition-colors"
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#38383A] text-sm font-medium text-gray-600 dark:text-[#98989D] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
           >
             {t('common', 'cancel')}
           </button>
@@ -400,19 +459,19 @@ function DeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+      <div className="relative bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
         <div className="text-3xl mb-3">🗑️</div>
         <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">
           {t('customers', 'delete_confirm_title')}
         </h3>
-        <p className="text-sm text-gray-500 dark:text-[#9A9690] mb-5">
+        <p className="text-sm text-gray-500 dark:text-[#98989D] mb-5">
           <strong className="text-gray-900 dark:text-white">"{name}"</strong> {t('customers', 'delete_confirm_msg')}
         </p>
         {error && <div className="mb-4 text-xs text-red-500 bg-red-50 dark:bg-[#2E1A10] p-2 rounded-lg">{error}</div>}
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#2E2C28] text-sm font-medium text-gray-600 dark:text-[#9A9690] hover:bg-gray-50 dark:hover:bg-[#1E1C1A] transition-colors"
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#38383A] text-sm font-medium text-gray-600 dark:text-[#98989D] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
           >
             {t('common', 'cancel')}
           </button>
@@ -433,6 +492,10 @@ function DeleteModal({
 /* ─── Main Customers Page ─── */
 export default function CustomersPage() {
   const { t } = useTranslation()
+  // Delete is manager and owner only (blueprint C4); the router
+  // enforces it, the UI mirrors it by hiding the action for cashiers.
+  const { role } = useShop()
+  const canDelete = role !== 'cashier'
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [analyticsId, setAnalyticsId] = useState<string | null>(null)
@@ -449,6 +512,13 @@ export default function CustomersPage() {
   const { data: customers, isLoading } = trpc.customers.list.useQuery({
     search: search || undefined,
   })
+
+  // Truthful outstanding per customer from the payments ledger
+  // (opening balance + open bills' balance_due), shared with /udhaar.
+  const { data: udhaarData } = trpc.reminders.listDue.useQuery()
+  const outstandingByCustomer = new Map<string, number>(
+    (udhaarData?.entries || []).map((e) => [e.customer_id, e.outstanding])
+  )
 
   const deleteMut = trpc.customers.delete.useMutation({
     onSuccess: () => {
@@ -539,7 +609,7 @@ export default function CustomersPage() {
           <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             {t('customers', 'title')} 🤝
           </h1>
-          <p className="text-sm text-gray-400 dark:text-[#5C5A56] mt-0.5">
+          <p className="text-sm text-gray-400 dark:text-[#98989D] mt-0.5">
             {isLoading ? '...' : `${customers?.length ?? 0} ${t('customers', 'total_customers')}`}
           </p>
         </div>
@@ -554,7 +624,7 @@ export default function CustomersPage() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-[#252320] transition-all active:scale-[0.98] shadow-sm disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-all active:scale-[0.98] shadow-sm disabled:opacity-50"
           >
             {isImporting ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : <span>📄</span>}
             Import CSV
@@ -573,23 +643,23 @@ export default function CustomersPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         {/* Search */}
         <div className="relative w-full max-w-md">
-          <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C5A56] w-4 h-4 pointer-events-none" />
+          <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#98989D] w-4 h-4 pointer-events-none" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('customers', 'search_placeholder')}
-            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
           />
         </div>
 
         {/* View Toggle */}
-        <div className="flex p-1 bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-xl shadow-sm shrink-0">
+        <div className="flex p-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-sm shrink-0">
           <button
             onClick={() => setViewMode('grid')}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
               viewMode === 'grid' 
                 ? 'bg-[#1B7A4A] text-white shadow-md' 
-                : 'text-gray-500 hover:text-gray-900 dark:text-[#9A9690] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#252320]'
+                : 'text-gray-500 hover:text-gray-900 dark:text-[#98989D] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
             }`}
           >
             <GridIcon className="w-4 h-4" />
@@ -599,7 +669,7 @@ export default function CustomersPage() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
               viewMode === 'list' 
                 ? 'bg-[#1B7A4A] text-white shadow-md' 
-                : 'text-gray-500 hover:text-gray-900 dark:text-[#9A9690] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#252320]'
+                : 'text-gray-500 hover:text-gray-900 dark:text-[#98989D] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
             }`}
           >
             <ListIcon className="w-4 h-4" />
@@ -611,7 +681,7 @@ export default function CustomersPage() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl p-4 space-y-3">
+            <div key={i} className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-4 space-y-3">
               <div className="flex gap-3">
                 <Skeleton className="w-12 h-12 rounded-full flex-shrink-0" />
                 <div className="flex-1 space-y-2 mt-1">
@@ -630,7 +700,7 @@ export default function CustomersPage() {
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
             {search ? t('customers', 'no_customers_found') : t('customers', 'customer_list_empty')}
           </h3>
-          <p className="text-sm text-gray-400 dark:text-[#5C5A56] mb-6 max-w-xs">
+          <p className="text-sm text-gray-400 dark:text-[#98989D] mb-6 max-w-xs">
             {search ? t('customers', 'remove_filter') : t('customers', 'add_first')}
           </p>
           {!search && (
@@ -650,31 +720,34 @@ export default function CustomersPage() {
               customer={c as Customer}
               onEdit={handleEdit}
               onDelete={(id) => handleDeleteClick(id, c.name)}
+              canDelete={canDelete}
+              outstanding={outstandingByCustomer.get(c.id) || 0}
               onViewAnalytics={setAnalyticsId}
               t={t}
             />
           ))}
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl overflow-hidden shadow-sm overflow-x-auto hide-scrollbar">
+        <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl overflow-hidden shadow-sm overflow-x-auto hide-scrollbar">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
-              <tr className="bg-gray-50/50 dark:bg-[#1C1C1E] border-b border-gray-100 dark:border-[#2E2C28]">
+              <tr className="bg-gray-50/50 dark:bg-[#1C1C1E] border-b border-gray-100 dark:border-[#38383A]">
                 <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Customer Name</th>
                 <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Contact</th>
                 <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Total Billed</th>
+                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Udhaar Baki</th>
                 <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Bills</th>
                 <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-[#2E2C28]">
+            <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
               {customers.map((c) => {
                 const [bg, text] = avatarColor(c.name)
                 return (
                   <tr 
                     key={c.id} 
                     onClick={() => setAnalyticsId(c.id)}
-                    className="hover:bg-gray-50/50 dark:hover:bg-[#252320] transition-colors cursor-pointer group"
+                    className="hover:bg-gray-50/50 dark:hover:bg-[#2C2C2E] transition-colors cursor-pointer group"
                   >
                     <td className="p-4">
                       <div className="flex items-center gap-3">
@@ -685,28 +758,43 @@ export default function CustomersPage() {
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="text-sm text-gray-600 dark:text-[#9A9690]">{c.phone || '-'}</div>
+                      <div className="text-sm text-gray-600 dark:text-[#98989D]">{c.phone || '-'}</div>
                     </td>
                     <td className="p-4 text-right">
                       <div className="text-sm font-extrabold text-gray-900 dark:text-white">{formatINR(Number(c.total_billed))}</div>
                     </td>
                     <td className="p-4 text-right">
-                      <div className="text-sm font-bold text-gray-600 dark:text-[#9A9690]">{c.bill_count}</div>
+                      {(outstandingByCustomer.get(c.id) || 0) > 0 ? (
+                        <a
+                          href="/udhaar"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm font-extrabold text-red-600 dark:text-red-400 hover:underline"
+                        >
+                          {formatINR(outstandingByCustomer.get(c.id) || 0)}
+                        </a>
+                      ) : (
+                        <div className="text-sm text-gray-400">-</div>
+                      )}
                     </td>
                     <td className="p-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="text-sm font-bold text-gray-600 dark:text-[#98989D]">{c.bill_count}</div>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleEdit(c as Customer); }}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-[#1B7A4A] dark:hover:text-[#2BB673] hover:bg-gray-50 dark:hover:bg-[#1E1C1A] transition-colors"
+                          className="tap w-11 h-11 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-[#1B7A4A] dark:hover:text-[#25D366] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
                         >
                           <PencilIcon />
                         </button>
+                        {canDelete && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteClick(c.id, c.name); }}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-[#2E1A10] transition-colors"
+                          className="tap w-11 h-11 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-[#2E1A10] transition-colors"
                         >
                           <TrashIcon />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>

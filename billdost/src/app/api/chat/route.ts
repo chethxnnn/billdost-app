@@ -1,11 +1,19 @@
 import { google } from '@ai-sdk/google'
-import { streamText, tool, convertToModelMessages } from 'ai'
+import { streamText, tool, convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { requireShopAccess } from '@/server/utils/auth'
 
+export const maxDuration = 30
+
 export async function POST(req: Request) {
-  const { messages } = await req.json()
+  let messages: UIMessage[]
+  try {
+    const body = await req.json()
+    messages = Array.isArray(body?.messages) ? body.messages : []
+  } catch {
+    return new Response('Invalid JSON body', { status: 400 })
+  }
 
   // Authenticate user and get shop ID
   const supabase = await createClient()
@@ -23,44 +31,59 @@ export async function POST(req: Request) {
   }
 
   const validMessages = messages.filter(
-    (m: any) => m.role && (typeof m.content === 'string' || Array.isArray(m.content) || Array.isArray(m.parts))
+    (m) => m && typeof m.role === 'string' && Array.isArray(m.parts) && m.parts.length > 0
   )
 
   const coreMessages = await convertToModelMessages(validMessages)
 
   const result = await streamText({
     model: google('gemini-2.0-flash'),
-    system: `You are BillDost Assistant, a specialized AI for shop owners using the BillDost POS system. 
+    system: `You are BillDost Assistant, a specialized AI for shop owners using the BillDost POS system.
 CRITICAL RULES:
 1. YOU MUST STRICTLY REFUSE TO ANSWER ANY QUESTION THAT IS NOT RELATED TO BILLDOST, THE USER'S SHOP DATA, OR BUSINESS MANAGEMENT. If asked about general knowledge, coding, history, or anything off-topic, reply: "I can only answer questions related to your BillDost shop data."
 2. ALWAYS use your tools to fetch real data from Supabase before answering questions about sales, invoices, customers, or inventory. NEVER invent or hallucinate data.
 3. Be concise and professional.
 4. If the user wants to navigate somewhere, use the navigateApp tool.`,
     messages: coreMessages,
+    stopWhen: stepCountIs(5),
 
     tools: {
       getShopStats: tool({
         description: 'Get high-level statistics about the shop like total revenue, total customers, and pending payments.',
-        parameters: z.object({}),
+        inputSchema: z.object({}),
         execute: async () => {
-          // Fetch real stats
-          const { data: invoices } = await supabase
+          // Active bills only: the document status column is real
+          // (migration 0003) and cancelled bills are excluded on
+          // purpose. Errors are returned to the model, never silently
+          // read as zeros (blueprint C11).
+          const { data: invoices, error } = await supabase
             .from('invoices')
-            .select('total, payment_status')
+            .select('total, amount_paid, balance_due, payment_status')
             .eq('shop_id', shop.id)
-            .neq('status', 'cancelled')
+            .eq('status', 'active')
+
+          if (error) {
+            return { error: 'Shop data could not be loaded right now.' }
+          }
 
           const { count: customersCount } = await supabase
             .from('customers')
             .select('*', { count: 'exact', head: true })
             .eq('shop_id', shop.id)
 
-          const totalRevenue = invoices?.reduce((acc, inv) => acc + Number(inv.total), 0) || 0
-          const pendingAmount = invoices?.filter(i => i.payment_status === 'unpaid' || i.payment_status === 'partial')
-            .reduce((acc, inv) => acc + Number(inv.total), 0) || 0
+          const rows = invoices ?? []
+          // Billed is what was charged; revenue is what was actually
+          // received. Pending is the balance still owed, not the full
+          // totals of unpaid bills.
+          const totalBilled = rows.reduce((acc, inv) => acc + Number(inv.total), 0)
+          const totalRevenue = rows.reduce((acc, inv) => acc + Number(inv.amount_paid), 0)
+          const pendingAmount = rows
+            .filter((i) => i.payment_status === 'unpaid' || i.payment_status === 'partial')
+            .reduce((acc, inv) => acc + Number(inv.balance_due), 0)
 
           return {
             totalRevenue,
+            totalBilled,
             pendingPayments: pendingAmount,
             totalCustomers: customersCount || 0
           }
@@ -68,11 +91,11 @@ CRITICAL RULES:
       }),
       getInvoices: tool({
         description: 'Fetch recent invoices. Can optionally filter by limit.',
-        parameters: z.object({
+        inputSchema: z.object({
           limit: z.number().optional().describe('Number of invoices to return, defaults to 5'),
           status: z.string().optional().describe('Filter by payment status: paid, unpaid, partial'),
         }),
-        execute: async ({ limit = 5, status }) => {
+        execute: async ({ limit = 5, status }: { limit?: number; status?: string }) => {
           let query = supabase
             .from('invoices')
             .select('id, invoice_number, customer_name, total, payment_status, invoice_date')
@@ -91,10 +114,10 @@ CRITICAL RULES:
       }),
       getCustomers: tool({
         description: 'Search for customers by name or phone number.',
-        parameters: z.object({
+        inputSchema: z.object({
           searchQuery: z.string().optional().describe('Name or phone number to search for'),
         }),
-        execute: async ({ searchQuery }) => {
+        execute: async ({ searchQuery }: { searchQuery?: string }) => {
           let query = supabase
             .from('customers')
             .select('id, name, phone, address, total_billed')
@@ -112,11 +135,11 @@ CRITICAL RULES:
       }),
       getProducts: tool({
         description: 'Fetch the shop\'s product catalog/inventory. Useful for checking stock, low stock items, prices, or finding specific items.',
-        parameters: z.object({
+        inputSchema: z.object({
           searchQuery: z.string().optional().describe('Name of product to search for'),
           lowStockOnly: z.boolean().optional().describe('If true, only returns products where stock_qty is less than or equal to low_stock_alert'),
         }),
-        execute: async ({ searchQuery, lowStockOnly }) => {
+        execute: async ({ searchQuery, lowStockOnly }: { searchQuery?: string; lowStockOnly?: boolean }) => {
           let query = supabase
             .from('products')
             .select('id, name, price, stock_qty, low_stock_alert, category')
@@ -126,19 +149,19 @@ CRITICAL RULES:
           if (searchQuery) {
             query = query.ilike('name', `%${searchQuery}%`)
           }
-          
+
           const { data, error } = await query
           if (error) throw new Error(error.message)
-            
+
           if (lowStockOnly && data) {
-            return data.filter(p => p.stock_qty <= (p.low_stock_alert || 0))
+            return data.filter((p) => (p.stock_qty ?? 0) <= (p.low_stock_alert || 0))
           }
           return data
         },
       }),
       navigateApp: tool({
         description: 'Tells the frontend to navigate the user to a specific page in the app. Call this when the user asks to "go to", "open", "create", or "show me" a page.',
-        parameters: z.object({
+        inputSchema: z.object({
           destination: z.enum([
             '/dashboard',
             '/invoices',
@@ -148,7 +171,7 @@ CRITICAL RULES:
             '/settings'
           ]).describe('The route to navigate to. E.g., for "create invoice" use /invoices/new'),
         }),
-        execute: async ({ destination }) => {
+        execute: async ({ destination }: { destination: string }) => {
           // Returning this tells the frontend to perform the navigation
           return { command: 'NAVIGATE', destination }
         },

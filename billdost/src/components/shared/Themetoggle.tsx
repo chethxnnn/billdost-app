@@ -8,15 +8,16 @@ export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => setMounted(true), [])
-  if (!mounted) return <div className="w-9 h-9" /> // placeholder to prevent layout shift
+  if (!mounted) return <div className="w-11 h-11" /> // placeholder to prevent layout shift
 
   const isDark = theme === 'dark'
 
   return (
     <button
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110 bg-gray-100 dark:bg-[#252320] text-gray-600 dark:text-[#9A9690] hover:bg-gray-200 dark:hover:bg-[#2E2C28]"
+      className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110 bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#98989D] hover:bg-gray-200 dark:hover:bg-[#38383A]"
       title={isDark ? 'Light mode' : 'Dark mode'}
+      aria-label={isDark ? 'Light mode on karo' : 'Dark mode on karo'}
     >
       {isDark ? (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

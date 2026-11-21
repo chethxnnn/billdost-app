@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
-import { resolveShopAndRole } from '../utils/auth'
+import { requireManagerOrOwner, resolveShopAndRole } from '../utils/auth'
+import { orIlikePattern } from '@/lib/search'
 
 /* ─── Shared schema ─── */
 const customerInput = z.object({
@@ -12,6 +13,11 @@ const customerInput = z.object({
   address:  z.string().max(300).optional().nullable(),
   notes:    z.string().max(500).optional().nullable(),
   tags:     z.array(z.string()).default([]),
+  // Place-of-supply facts (migration 0003): GSTIN and state drive the
+  // IGST vs CGST/SGST decision in src/lib/money.ts.
+  gstin:    z.string().max(15).optional().nullable(),
+  state:    z.string().max(60).optional().nullable(),
+  state_code: z.string().regex(/^\d{2}$/).optional().nullable(),
 })
 
 /* ─── Helper ─── */
@@ -23,7 +29,7 @@ async function getShop(supabase: any, userId: string) {
 
 export const customersRouter = router({
   /* ─────────────────────────────────────────
-     LIST  — all customers for the shop
+     LIST - all customers for the shop
      Supports optional ?search
   ───────────────────────────────────────── */
   list: protectedProcedure
@@ -36,10 +42,11 @@ export const customersRouter = router({
         .from('customers')
         .select('*')
         .eq('shop_id', shop.id)
+        .eq('is_active', true)
         .order('name', { ascending: true })
 
       if (input?.search && input.search.trim()) {
-        const s = `%${input.search.trim()}%`
+        const s = orIlikePattern(input.search)
         query = query.or(`name.ilike.${s},phone.ilike.${s}`)
       }
 
@@ -203,27 +210,23 @@ export const customersRouter = router({
     }),
 
   /* ─────────────────────────────────────────
-     HARD DELETE
+     DELETE (soft, blueprint C4): manager and owner only. The row is
+     kept (bills reference it), is_active flips to false and the list
+     stops showing the customer. There is no hard delete in the app.
   ───────────────────────────────────────── */
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { supabase, user } = ctx
-      const shop = await getShop(supabase, user.id)
+      const shop = await requireManagerOrOwner(supabase, user.id)
 
       const { error } = await supabase
         .from('customers')
-        .delete()
+        .update({ is_active: false, updated_at: new Date().toISOString() })
         .eq('id', input.id)
         .eq('shop_id', shop.id)
 
-      if (error) {
-        // usually fails if they have existing invoices due to foreign keys
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Is customer ki purani bills hain, pehle bills delete karni padegi.',
-        })
-      }
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       return { success: true }
     }),
 

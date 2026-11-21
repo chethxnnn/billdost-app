@@ -1,7 +1,10 @@
 'use client'
 
+import { useEffect } from 'react'
 import { ArrowUpRight, ArrowDownRight, Package, Users, Receipt, IndianRupee, Link as LinkIcon, Download, AlertTriangle } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
+import { saveActivitySnapshot } from '@/lib/activity-snapshot'
+import { PaymentStatusBadge } from '@/components/invoices/PaymentStatusBadge'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -39,7 +42,7 @@ const activityIcon: Record<string, React.ReactNode> = {
 
 /* ─── Skeleton ─── */
 function Skeleton({ className = '', style }: { className?: string, style?: React.CSSProperties }) {
-  return <div className={`animate-pulse rounded-xl bg-gray-100 dark:bg-[#2E2C28] ${className}`} style={style} />
+  return <div className={`animate-pulse rounded-xl bg-gray-100 dark:bg-[#38383A] ${className}`} style={style} />
 }
 
 /* ─── Stat Card ─── */
@@ -56,7 +59,7 @@ function StatCard({ label, value, sub, icon, accent, loading }: StatCardProps) {
   return (
     <div className="bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border border-black/5 dark:border-white/5 rounded-[24px] p-5 flex flex-col gap-3 ios-shadow hover:scale-[1.02] transition-all duration-300">
       <div className="flex items-center justify-between">
-        <span className="text-[12px] font-semibold text-[#86868B] dark:text-[#98989D] uppercase tracking-wider">
+        <span className="text-[12px] font-semibold text-[#6E6E73] dark:text-[#98989D] uppercase tracking-wider">
           {label}
         </span>
         <div
@@ -76,7 +79,7 @@ function StatCard({ label, value, sub, icon, accent, loading }: StatCardProps) {
       {loading ? (
         <Skeleton className="h-4 w-24" />
       ) : (
-        <div className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">{sub}</div>
+        <div className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D]">{sub}</div>
       )}
     </div>
   )
@@ -86,11 +89,13 @@ function StatCard({ label, value, sub, icon, accent, loading }: StatCardProps) {
 function WeeklyChart({
   data,
   loading,
-  t
+  t,
+  prevWeekTotal
 }: {
   data: any
   loading: boolean
   t: any
+  prevWeekTotal?: number | null
 }) {
   const total = data?.reduce((acc: number, d: any) => acc + (d.revenue || d.total || 0), 0) || 0
   const max = data && data.length > 0 ? Math.max(...data.map((d: any) => d.revenue || d.total || 0)) : 1
@@ -106,7 +111,7 @@ function WeeklyChart({
           <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
             {t('dashboard', 'weekly_revenue')}
           </h3>
-          <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">
+          <p className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D]">
             {t('dashboard', 'weekly_revenue_sub')}
           </p>
         </div>
@@ -115,33 +120,53 @@ function WeeklyChart({
             <div className="text-[20px] font-bold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
               {formatINR(total)}
             </div>
-            <div className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D]">
+            <div className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D]">
               {t('dashboard', 'weekly_revenue_sub')}
             </div>
           </div>
         )}
       </div>
 
-      {/* Quick Insights */}
-      {!loading && data && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
+      {/* Quick Insights. Growth is computed from real data (last 7 days
+          vs the 7 before, from analytics.weeklyRevenue) and the tile is
+          not rendered at all when there is no previous period to
+          compare against. A decorative number never ships here. */}
+      {!loading && data && (() => {
+        const growthPct =
+          prevWeekTotal !== null && prevWeekTotal !== undefined && prevWeekTotal > 0
+            ? ((total - prevWeekTotal) / prevWeekTotal) * 100
+            : null
+        const growthUp = growthPct !== null && growthPct >= 0
+        return (
+        <div className={`grid ${growthPct !== null ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mb-6`}>
           <div className="bg-black/5 dark:bg-white/5 rounded-[16px] p-3 flex flex-col items-center justify-center text-center transition-transform hover:scale-105">
-            <span className="text-[11px] font-medium text-[#86868B] dark:text-[#98989D] mb-1">Daily Avg</span>
+            <span className="text-[11px] font-medium text-[#6E6E73] dark:text-[#98989D] mb-1">Daily Avg</span>
             <span className="text-[15px] font-bold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">{formatINR(avg)}</span>
           </div>
           <div className="bg-black/5 dark:bg-white/5 rounded-[16px] p-3 flex flex-col items-center justify-center text-center transition-transform hover:scale-105">
-            <span className="text-[11px] font-medium text-[#86868B] dark:text-[#98989D] mb-1">Best Day</span>
+            <span className="text-[11px] font-medium text-[#6E6E73] dark:text-[#98989D] mb-1">Best Day</span>
             <span className="text-[15px] font-bold text-[#1B7A4A] dark:text-[#25D366] tracking-tight">{bestDay !== '-' && max > 0 ? bestDay : 'None'}</span>
           </div>
-          <div className="bg-[#1B7A4A]/10 dark:bg-[#25D366]/10 rounded-[16px] p-3 flex flex-col items-center justify-center text-center transition-transform hover:scale-105 border border-[#1B7A4A]/20 dark:border-[#25D366]/20">
-            <span className="text-[11px] font-medium text-[#1B7A4A] dark:text-[#25D366] mb-1">Growth</span>
-            <span className="text-[15px] font-bold text-[#1B7A4A] dark:text-[#25D366] tracking-tight flex items-center gap-1">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
-              14.5%
-            </span>
-          </div>
+          {growthPct !== null && (
+            <div className={`rounded-[16px] p-3 flex flex-col items-center justify-center text-center transition-transform hover:scale-105 border ${
+              growthUp
+                ? 'bg-[#1B7A4A]/10 dark:bg-[#25D366]/10 border-[#1B7A4A]/20 dark:border-[#25D366]/20'
+                : 'bg-[#FF3B30]/10 dark:bg-[#FF453A]/10 border-[#FF3B30]/20 dark:border-[#FF453A]/20'
+            }`}>
+              <span className={`text-[11px] font-medium mb-1 ${growthUp ? 'text-[#1B7A4A] dark:text-[#25D366]' : 'text-[#FF3B30] dark:text-[#FF453A]'}`}>Growth (7d vs 7d)</span>
+              <span className={`text-[15px] font-bold tracking-tight flex items-center gap-1 ${growthUp ? 'text-[#1B7A4A] dark:text-[#25D366]' : 'text-[#FF3B30] dark:text-[#FF453A]'}`}>
+                {growthUp ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></svg>
+                )}
+                {growthUp ? '+' : ''}{growthPct.toFixed(1)}%
+              </span>
+            </div>
+          )}
         </div>
-      )}
+        )
+      })()}
 
       {loading ? (
         <div className="flex items-end gap-2.5 h-[120px] mt-auto">
@@ -181,7 +206,7 @@ function WeeklyChart({
                   className={`text-[11px] font-semibold ${
                     d.isToday
                       ? 'text-[#1B7A4A] dark:text-[#25D366]'
-                      : 'text-[#86868B] dark:text-[#98989D]'
+                      : 'text-[#6E6E73] dark:text-[#98989D]'
                   }`}
                 >
                   {d.label}
@@ -196,34 +221,6 @@ function WeeklyChart({
 }
 
 /* ─── Status Badge ─── */
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    paid: {
-      label: 'Paid',
-      cls: 'bg-[#34C759]/10 text-[#34C759] dark:bg-[#30D158]/20 dark:text-[#30D158]',
-    },
-    partial: {
-      label: 'Partial',
-      cls: 'bg-[#FF9500]/10 text-[#FF9500] dark:bg-[#FF9F0A]/20 dark:text-[#FF9F0A]',
-    },
-    unpaid: {
-      label: 'Pending',
-      cls: 'bg-[#FF3B30]/10 text-[#FF3B30] dark:bg-[#FF453A]/20 dark:text-[#FF453A]',
-    },
-  }
-  const s = map[status] ?? {
-    label: status,
-    cls: 'bg-black/5 text-[#86868B] dark:bg-white/10 dark:text-[#98989D]',
-  }
-  return (
-    <span
-      className={`inline-flex items-center text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${s.cls}`}
-    >
-      {s.label}
-    </span>
-  )
-}
-
 /* ─── Recent Invoices ─── */
 function RecentInvoices({
   data,
@@ -248,7 +245,7 @@ function RecentInvoices({
           <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
             {t('dashboard', 'recent_bills')}
           </h3>
-          <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">
+          <p className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D]">
             {t('dashboard', 'recent_bills_sub')}
           </p>
         </div>
@@ -275,10 +272,10 @@ function RecentInvoices({
         </div>
       ) : !data || data.length === 0 ? (
         <div className="text-center py-10 bg-black/5 dark:bg-white/5 rounded-[16px]">
-          <div className="flex justify-center mb-4 text-[#86868B] dark:text-[#98989D]">
+          <div className="flex justify-center mb-4 text-[#6E6E73] dark:text-[#98989D]">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </div>
-          <p className="text-[14px] font-medium text-[#86868B] dark:text-[#98989D]">
+          <p className="text-[14px] font-medium text-[#6E6E73] dark:text-[#98989D]">
             {t('dashboard', 'no_bills')}
           </p>
           <Link
@@ -305,7 +302,7 @@ function RecentInvoices({
                 <div className="text-[15px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight truncate">
                   {inv.customer_name}
                 </div>
-                <div className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">
+                <div className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D]">
                   {inv.invoice_number} ·{' '}
                   {new Date(inv.invoice_date).toLocaleDateString('en-IN', {
                     day: 'numeric',
@@ -318,7 +315,7 @@ function RecentInvoices({
                 <div className="text-[15px] font-bold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight mb-1">
                   {formatINR(Number(inv.total))}
                 </div>
-                <StatusBadge status={inv.payment_status} />
+                <PaymentStatusBadge status={inv.payment_status} />
               </div>
             </Link>
           ))}
@@ -350,7 +347,7 @@ function ActivityFeed({
           <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
             {t('dashboard', 'activity_stream')}
           </h3>
-          <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">
+          <p className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D]">
             {t('dashboard', 'activity_stream_sub')}
           </p>
         </div>
@@ -371,7 +368,7 @@ function ActivityFeed({
           </div>
         ) : !data || data.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-[14px] text-[#86868B] dark:text-[#98989D]">{t('dashboard', 'no_activity')}</p>
+            <p className="text-[14px] text-[#6E6E73] dark:text-[#98989D]">{t('dashboard', 'no_activity')}</p>
           </div>
         ) : (
           <div className="relative h-full pr-2 overflow-y-auto max-h-[300px] scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10 scrollbar-track-transparent">
@@ -390,7 +387,7 @@ function ActivityFeed({
                       <p className="text-[13px] font-medium text-[#1D1D1F] dark:text-[#F5F5F7] leading-snug group-hover:text-[#1B7A4A] dark:group-hover:text-[#25D366] transition-colors">
                         {act.summary}
                       </p>
-                      <p className="text-[11px] font-medium text-[#86868B] dark:text-[#98989D] mt-1">
+                      <p className="text-[11px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-1">
                         {timeAgo(act.created_at)}
                       </p>
                     </div>
@@ -444,7 +441,7 @@ function LowStockAlerts({
           </h3>
         </div>
         <Link
-          href="/catalog"
+          href="/low-stock"
           className="text-[13px] text-[#FF3B30] dark:text-[#FF453A] font-semibold hover:underline"
         >
           {t('dashboard', 'view_all')} →
@@ -474,7 +471,7 @@ function LowStockAlerts({
               </div>
               <Link
                 href={`/catalog`}
-                className="opacity-0 group-hover:opacity-100 p-2 bg-[#FF3B30]/10 text-[#FF3B30] dark:bg-[#FF453A]/20 dark:text-[#FF453A] rounded-full transition-opacity"
+                className="tap p-2 bg-[#FF3B30]/10 text-[#FF3B30] dark:bg-[#FF453A]/20 dark:text-[#FF453A] rounded-full transition-opacity"
               >
                 <ArrowUpRight className="w-4 h-4" />
               </Link>
@@ -515,124 +512,6 @@ function QuickActions() {
   )
 }
 
-/* ─── AI/ML Forecast Widget ─── */
-function MLForecastWidget({
-  data,
-  loading,
-}: {
-  data?: Array<{ productName: string; predictedQuantity: number; trend: string; reason: string; recentSales: number }>
-  loading: boolean
-}) {
-  return (
-    <div className="bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border border-black/5 dark:border-white/5 rounded-[24px] p-6 ios-shadow h-full flex flex-col">
-      <div className="flex items-center gap-2 mb-6">
-        <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <div>
-          <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
-            Sales Forecast (Next 7 Days)
-          </h3>
-          <p className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D]">
-            Powered by Local Math Model
-          </p>
-        </div>
-      </div>
-      
-      {loading ? (
-        <div className="space-y-4 flex-1">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-[14px]" />
-          ))}
-        </div>
-      ) : !data || data.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <p className="text-[13px] text-[#86868B] dark:text-[#98989D]">Not enough sales history to forecast.</p>
-        </div>
-      ) : (
-        <div className="space-y-3 flex-1 overflow-y-auto pr-2 scrollbar-none">
-          {data.map((item, idx) => (
-            <div key={idx} className="bg-black/5 dark:bg-white/5 rounded-[16px] p-3 flex items-start gap-3 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-2 opacity-10">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-              </div>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${item.trend === 'up' ? 'bg-green-500/10 text-green-500' : item.trend === 'down' ? 'bg-red-500/10 text-red-500' : 'bg-gray-500/10 text-gray-500'}`}>
-                {item.trend === 'up' ? <ArrowUpRight className="w-5 h-5" /> : item.trend === 'down' ? <ArrowDownRight className="w-5 h-5" /> : <span className="text-sm font-bold">-</span>}
-              </div>
-              <div className="flex-1 min-w-0 z-10">
-                <div className="flex justify-between items-center mb-1">
-                  <div className="text-[14px] font-bold text-[#1D1D1F] dark:text-[#F5F5F7] truncate pr-2">{item.productName}</div>
-                  <div className="text-[16px] font-black text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">{item.predictedQuantity} <span className="text-[10px] text-[#86868B] dark:text-[#98989D] font-medium">units</span></div>
-                </div>
-                <p className="text-[11px] text-[#86868B] dark:text-[#98989D] leading-snug">{item.reason}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* ─── Top Customers Widget ─── */
-function TopCustomersWidget({
-  data,
-  loading,
-}: {
-  data?: Array<{ name: string; total_billed: number }>
-  loading: boolean
-}) {
-  const max = data && data.length > 0 ? Math.max(...data.map(d => Number(d.total_billed || 0))) : 1
-
-  return (
-    <div className="bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border border-black/5 dark:border-white/5 rounded-[24px] p-6 ios-shadow h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
-            Top Customers
-          </h3>
-          <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">
-            By total billed amount
-          </p>
-        </div>
-        <Users className="w-6 h-6 text-[#1B7A4A] dark:text-[#25D366] opacity-50" />
-      </div>
-
-      <div className="flex-1 flex flex-col justify-center gap-4">
-        {loading ? (
-          [...Array(4)].map((_, i) => (
-            <div key={i} className="w-full space-y-1">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-2 w-full rounded-full" />
-            </div>
-          ))
-        ) : !data || data.length === 0 ? (
-          <div className="text-center text-[13px] text-[#86868B] dark:text-[#98989D]">No customers found.</div>
-        ) : (
-          data.map((c, i) => {
-            const val = Number(c.total_billed || 0)
-            const pct = (val / max) * 100
-            return (
-              <div key={i} className="w-full relative group">
-                <div className="flex justify-between items-end mb-1.5">
-                  <span className="text-[13px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] truncate pr-4">{c.name}</span>
-                  <span className="text-[12px] font-bold text-[#86868B] dark:text-[#98989D]">{formatINR(val)}</span>
-                </div>
-                <div className="h-2 w-full bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-[#1B7A4A] to-[#25D366] rounded-full transition-all duration-1000 ease-out" 
-                    style={{ width: `${Math.max(pct, 2)}%` }}
-                  />
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-    </div>
-  )
-}
-
 /* ─── Quick Analytics Summary ─── */
 function QuickAnalyticsSummary({
   forecastData,
@@ -654,7 +533,7 @@ function QuickAnalyticsSummary({
           <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
             AI Analytics & VIPs
           </h3>
-          <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">
+          <p className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D]">
             A quick glimpse at your business momentum
           </p>
         </div>
@@ -669,11 +548,11 @@ function QuickAnalyticsSummary({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
         <div>
-          <h4 className="text-[12px] font-bold text-[#86868B] dark:text-[#98989D] uppercase tracking-wider mb-3">Top VIP Customers</h4>
+          <h4 className="text-[12px] font-bold text-[#6E6E73] dark:text-[#98989D] uppercase tracking-wider mb-3">Top VIP Customers</h4>
           {loading ? (
              <div className="space-y-2"><div className="animate-pulse h-4 w-32 bg-black/5 dark:bg-white/5"/><div className="animate-pulse h-4 w-24 bg-black/5 dark:bg-white/5"/></div>
           ) : !topCustomersData || topCustomersData.length === 0 ? (
-            <p className="text-[13px] text-[#86868B] dark:text-[#98989D]">No data yet.</p>
+            <p className="text-[13px] text-[#6E6E73] dark:text-[#98989D]">No data yet.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {topCustomersData.slice(0, 3).map((c, i) => (
@@ -685,11 +564,11 @@ function QuickAnalyticsSummary({
           )}
         </div>
         <div>
-          <h4 className="text-[12px] font-bold text-[#86868B] dark:text-[#98989D] uppercase tracking-wider mb-3">Hot Products Forecast</h4>
+          <h4 className="text-[12px] font-bold text-[#6E6E73] dark:text-[#98989D] uppercase tracking-wider mb-3">Hot Products Forecast</h4>
           {loading ? (
             <div className="space-y-2"><div className="animate-pulse h-4 w-32 bg-black/5 dark:bg-white/5"/><div className="animate-pulse h-4 w-24 bg-black/5 dark:bg-white/5"/></div>
           ) : !forecastData || forecastData.length === 0 ? (
-            <p className="text-[13px] text-[#86868B] dark:text-[#98989D]">Not enough history.</p>
+            <p className="text-[13px] text-[#6E6E73] dark:text-[#98989D]">Not enough history.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {forecastData.slice(0, 3).map((f, i) => (
@@ -709,7 +588,8 @@ function QuickAnalyticsSummary({
 export default function DashboardPage() {
   const { data: overview, isLoading: ovLoading } =
     trpc.analytics.overview.useQuery()
-  const { data: lowStockItems } = trpc.products.lowStock.useQuery()
+  const { data: lowStockItems, isLoading: lowStockLoading } =
+    trpc.products.lowStock.useQuery()
   const { t } = useTranslation()
   const { data: weeklyRev, isLoading: weekLoading } =
     trpc.analytics.weeklyRevenue.useQuery()
@@ -721,6 +601,19 @@ export default function DashboardPage() {
     trpc.analytics.topCustomers.useQuery()
   const { data: forecastData, isLoading: forecastLoading } =
     trpc.analytics.predictProductSales.useQuery()
+
+  // Keep the local activity snapshot fresh so the personalized error
+  // fallback can show this user their own work, intact, on failure.
+  useEffect(() => {
+    if (!overview) return
+    saveActivitySnapshot({
+      shopName: overview.shopName || undefined,
+      todayBills: overview.billsSentToday ?? undefined,
+      todayTotal: overview.todayRevenue ?? undefined,
+      lastInvoiceNumber: recentInvoices?.[0]?.invoice_number || undefined,
+      lastCustomerName: recentInvoices?.[0]?.customer_name || undefined,
+    })
+  }, [overview, recentInvoices])
 
   return (
     <motion.div 
@@ -735,7 +628,7 @@ export default function DashboardPage() {
           <h1 className="text-[28px] font-bold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight leading-none mb-1.5">
             {t('dashboard', 'welcome')}
           </h1>
-          <p className="text-[14px] font-medium text-[#86868B] dark:text-[#98989D]">
+          <p className="text-[14px] font-medium text-[#6E6E73] dark:text-[#98989D]">
             {ovLoading
               ? '...'
               : overview?.shopName
@@ -800,13 +693,14 @@ export default function DashboardPage() {
         {/* Chart takes 2/3 */}
         <div className="lg:col-span-2">
           <WeeklyChart
-            data={weeklyRev?.map((d) => ({
+            data={weeklyRev?.days?.map((d) => ({
               label: d.label,
               revenue: d.revenue,
               isToday: d.isToday,
             }))}
             loading={weekLoading}
             t={t}
+            prevWeekTotal={weeklyRev?.prevWeekTotal}
           />
         </div>
         {/* Activity takes 1/3 on desktop */}
@@ -815,8 +709,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Low Stock Alerts */}
-      <LowStockAlerts data={lowStockItems ?? undefined} loading={false} />
+      {/* Low Stock Alerts: products.lowStock returns full product
+          rows (stock_qty, low_stock_alert); map them to the widget
+          shape instead of reading fields that do not exist. */}
+      <LowStockAlerts
+        data={(lowStockItems ?? []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          stock: Number(p.stock_qty) || 0,
+          low_stock_threshold: p.low_stock_alert,
+        }))}
+        loading={lowStockLoading}
+      />
 
       {/* Quick Analytics Summary */}
       <QuickAnalyticsSummary 
@@ -828,7 +732,7 @@ export default function DashboardPage() {
       {/* Recent invoices */}
       <RecentInvoices data={recentInvoices ?? undefined} loading={invLoading} t={t} />
 
-      {/* Activity feed (mobile — shown below invoices) */}
+      {/* Activity feed (mobile - shown below invoices) */}
       <div className="lg:hidden pb-4">
         <ActivityFeed data={activity ?? undefined} loading={actLoading} />
       </div>

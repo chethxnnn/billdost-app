@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
-import { requireShopAccess } from '../utils/auth'
+import { requireManagerOrOwner } from '../utils/auth'
 import { generateObject } from 'ai'
 import { google } from '@ai-sdk/google'
 
@@ -20,7 +20,7 @@ export const aiRouter = router({
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ ctx, input }) => {
       const { supabase, user } = ctx
-      await requireShopAccess(supabase, user.id)
+      await requireManagerOrOwner(supabase, user.id)
 
       try {
         const res = await fetch(input.url)
@@ -57,7 +57,7 @@ export const aiRouter = router({
     .input(z.object({ base64: z.string(), mimeType: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { supabase, user } = ctx
-      await requireShopAccess(supabase, user.id)
+      await requireManagerOrOwner(supabase, user.id)
 
       try {
         const { object } = await generateObject({

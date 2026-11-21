@@ -54,7 +54,7 @@ export default function SignupPage() {
     setLoading(false)
   }
 
-  // Success state — check your email
+  // Success state: check your email
   if (success) {
     return (
       <div className="w-full animate-in fade-in zoom-in-95 duration-500">
@@ -68,16 +68,16 @@ export default function SignupPage() {
           >
             Check your email
           </h1>
-          <p className="text-[15px] text-[#86868B] dark:text-[#98989D] mb-8 font-medium max-w-sm mx-auto leading-relaxed">
+          <p className="text-[15px] text-[#6E6E73] dark:text-[#98989D] mb-8 font-medium max-w-sm mx-auto leading-relaxed">
             We've sent a verification link to <strong className="text-[#1D1D1F] dark:text-[#F5F5F7]">{email}</strong>. Click the link to complete your setup.
           </p>
           
           <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 text-left mb-8">
             <p className="text-[13px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] mb-3">Didn't receive the email?</p>
-            <ul className="text-[13px] text-[#86868B] dark:text-[#98989D] space-y-2 font-medium">
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#86868B] dark:bg-[#98989D]" /> Check your Spam or Junk folder</li>
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#86868B] dark:bg-[#98989D]" /> Check the Promotions tab in Gmail</li>
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#86868B] dark:bg-[#98989D]" /> Verify that your email address is correct</li>
+            <ul className="text-[13px] text-[#6E6E73] dark:text-[#98989D] space-y-2 font-medium">
+              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#6E6E73] dark:bg-[#98989D]" /> Check your Spam or Junk folder</li>
+              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#6E6E73] dark:bg-[#98989D]" /> Check the Promotions tab in Gmail</li>
+              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#6E6E73] dark:bg-[#98989D]" /> Verify that your email address is correct</li>
             </ul>
           </div>
 
@@ -110,7 +110,7 @@ export default function SignupPage() {
         >
           Create account
         </h1>
-        <p className="text-[15px] text-[#86868B] dark:text-[#98989D] font-medium flex items-center justify-center gap-1">
+        <p className="text-[15px] text-[#6E6E73] dark:text-[#98989D] font-medium flex items-center justify-center gap-1">
           Start your free <span className="font-display font-bold text-[#1D1D1F] dark:text-[#F5F5F7]">Bill<span className="text-[#1B7A4A] dark:text-[#25D366]">Dost</span></span> account today
         </p>
       </div>
@@ -129,7 +129,7 @@ export default function SignupPage() {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Suresh Sharma"
               required
-              className="w-full px-4 py-3.5 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#86868B] dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 dark:focus:ring-[#25D366]/10 transition-all duration-300"
+              className="w-full px-4 py-3.5 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#6E6E73] dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 dark:focus:ring-[#25D366]/10 transition-all duration-300"
             />
           </div>
 
@@ -139,10 +139,10 @@ export default function SignupPage() {
               <label className="block text-[13px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">
                 WhatsApp Number
               </label>
-              <span className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D]">Optional</span>
+              <span className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D]">Optional</span>
             </div>
             <div className="flex group">
-              <span className="flex items-center justify-center px-4 bg-white dark:bg-[#2C2C2E] border border-r-0 border-black/10 dark:border-white/10 rounded-l-2xl text-[15px] font-medium text-[#86868B] dark:text-[#98989D] group-focus-within:border-[#1B7A4A] dark:group-focus-within:border-[#25D366] transition-colors duration-300">
+              <span className="flex items-center justify-center px-4 bg-white dark:bg-[#2C2C2E] border border-r-0 border-black/10 dark:border-white/10 rounded-l-2xl text-[15px] font-medium text-[#6E6E73] dark:text-[#98989D] group-focus-within:border-[#1B7A4A] dark:group-focus-within:border-[#25D366] transition-colors duration-300">
                 +91
               </span>
               <input
@@ -151,7 +151,7 @@ export default function SignupPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder="98765 43210"
-                className="w-full px-4 py-3.5 bg-white dark:bg-[#2C2C2E] border border-l-0 border-black/10 dark:border-white/10 rounded-r-2xl text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#86868B] dark:placeholder:text-[#98989D] outline-none group-focus-within:border-[#1B7A4A] dark:group-focus-within:border-[#25D366] group-focus-within:ring-4 group-focus-within:ring-[#1B7A4A]/10 dark:group-focus-within:ring-[#25D366]/10 transition-all duration-300"
+                className="w-full px-4 py-3.5 bg-white dark:bg-[#2C2C2E] border border-l-0 border-black/10 dark:border-white/10 rounded-r-2xl text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#6E6E73] dark:placeholder:text-[#98989D] outline-none group-focus-within:border-[#1B7A4A] dark:group-focus-within:border-[#25D366] group-focus-within:ring-4 group-focus-within:ring-[#1B7A4A]/10 dark:group-focus-within:ring-[#25D366]/10 transition-all duration-300"
               />
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function SignupPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@company.com"
               required
-              className="w-full px-4 py-3.5 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#86868B] dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 dark:focus:ring-[#25D366]/10 transition-all duration-300"
+              className="w-full px-4 py-3.5 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#6E6E73] dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 dark:focus:ring-[#25D366]/10 transition-all duration-300"
             />
           </div>
 
@@ -183,7 +183,7 @@ export default function SignupPage() {
               placeholder="At least 6 characters"
               required
               minLength={6}
-              className="w-full px-4 py-3.5 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#86868B] dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 dark:focus:ring-[#25D366]/10 transition-all duration-300"
+              className="w-full px-4 py-3.5 bg-white dark:bg-[#2C2C2E] border border-black/10 dark:border-white/10 rounded-2xl text-[15px] text-[#1D1D1F] dark:text-[#F5F5F7] placeholder:text-[#6E6E73] dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] focus:ring-4 focus:ring-[#1B7A4A]/10 dark:focus:ring-[#25D366]/10 transition-all duration-300"
             />
           </div>
 
@@ -213,7 +213,7 @@ export default function SignupPage() {
         </form>
 
         {/* Terms */}
-        <p className="text-[12px] text-[#86868B] dark:text-[#98989D] font-medium mt-6 text-center leading-relaxed">
+        <p className="text-[12px] text-[#6E6E73] dark:text-[#98989D] font-medium mt-6 text-center leading-relaxed">
           By signing up, you agree to our{' '}
           <Link href="/terms" className="text-[#1D1D1F] dark:text-[#F5F5F7] hover:underline underline-offset-2">
             Terms of Service
@@ -226,7 +226,7 @@ export default function SignupPage() {
       </div>
 
       {/* Login link */}
-      <p className="text-center text-[15px] font-medium text-[#86868B] dark:text-[#98989D] mt-8">
+      <p className="text-center text-[15px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-8">
         Already have an account?{' '}
         <Link
           href="/login"

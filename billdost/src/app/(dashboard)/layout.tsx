@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveShopAndRole } from '@/server/utils/auth'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 
-import { Chatbot } from '@/components/Chatbot'
+import { ChatbotLazy } from '@/components/ChatbotLazy'
 
 export default async function DashboardLayout({
   children,
@@ -39,13 +39,14 @@ export default async function DashboardLayout({
         shopId={shop.id}
         shopName={shop.name}
         shopCategory={shop.category}
+        shopLanguage={shop.language}
         userEmail={user.email || ''}
         userName={user.user_metadata?.full_name || shop.name}
         role={role}
       >
         {children}
       </DashboardShell>
-      <Chatbot />
+      <ChatbotLazy />
     </>
   )
 }
