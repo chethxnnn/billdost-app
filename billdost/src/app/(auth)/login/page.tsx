@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { LANDING_URL } from '@/lib/site'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -130,15 +131,16 @@ export default function LoginPage() {
         </form>
       </div>
 
-      {/* Sign up link */}
+      {/* Request access link: BillDost is invite-only, accounts are
+          created by the BillDost team after a personal call. */}
       <p className="text-center text-[15px] font-medium text-[#6E6E73] dark:text-[#98989D] mt-8">
-        Don't have an account?{' '}
-        <Link
-          href="/signup"
+        New to BillDost?{' '}
+        <a
+          href={LANDING_URL}
           className="text-[#1B7A4A] dark:text-[#25D366] font-bold hover:underline underline-offset-4"
         >
-          Sign up now
-        </Link>
+          Request Access
+        </a>
       </p>
     </div>
   )

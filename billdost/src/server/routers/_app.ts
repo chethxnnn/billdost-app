@@ -10,7 +10,6 @@ import { settingsRouter } from './settings'
 import { aiRouter } from './ai'
 import { whatsappRouter } from './whatsapp'
 import { searchRouter } from './search'
-import { onboardingRouter } from './onboarding'
 import { remindersRouter } from './reminders'
 import { expensesRouter } from './expenses'
 import { paymentsRouter } from './payments'
@@ -31,7 +30,6 @@ export const appRouter = router({
   ai: aiRouter,
   whatsapp: whatsappRouter,
   search: searchRouter,
-  onboarding: onboardingRouter,
   reminders: remindersRouter,
   expenses: expensesRouter,
   payments: paymentsRouter,

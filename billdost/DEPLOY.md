@@ -24,6 +24,7 @@ Preview). Where each value comes from:
 | `SUPABASE_SERVICE_ROLE_KEY` | Same screen, `service_role` `secret` key. Server only. Never paste this anywhere public, never commit it |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | Google AI Studio (aistudio.google.com), Get API key. Powers the `/api/chat` assistant |
 | `NEXT_PUBLIC_APP_URL` | The production URL, for example `https://billdost.in` (no trailing slash). Used to build CA share and PDF links |
+| `NEXT_PUBLIC_LANDING_URL` | Optional. The landing site with the Request Access form, default `https://billdost.in`. Public signup is closed; the signup page and login page point here |
 | `PORT` | Leave unset on Vercel (it manages the port). `3000` only for a self-hosted run |
 | `NODE_ENV` | Set by the host. Do not set it manually on Vercel |
 | `WHATSAPP_CLOUD_API_TOKEN` | Meta App Dashboard, WhatsApp, API Setup (section 4). Leave blank until section 4 is done |
@@ -277,6 +278,14 @@ once, with the app already deployed (the webhook needs a live URL).
    - `billdost_low_stock_v1`: body only, for the owner digest,
      exactly 3 text variables in this order: shop name, count of
      low items, item list text.
+   - `billdost_activation_v1` (used by the Admin Portal, section 6):
+     body only, exactly 4 text variables in this order: owner name,
+     shop name, activation link, support phone. Example body:
+     `Namaste {{1}}, your BillDost shop {{2}} is ready. Set your
+     password and enter your shop here: {{3}} This link works once
+     and expires in 72 hours. Need help? Call {{4}}.`
+   - `billdost_announcement_v1` (used by the Admin Portal for
+     broadcasts): body only, exactly 1 text variable: the message.
    Wait for Approved status on each before the test send.
 6. Set the Vercel env vars from section 1 (token, phone number ID,
    WABA ID, app secret, and a `WHATSAPP_WEBHOOK_VERIFY_TOKEN` you
@@ -330,3 +339,82 @@ Database rollback (careful):
   last resort, after the app rollback.
 - Keep the 2.1 backups and the `live-captured.sql` file for at least
   30 days after go-live.
+
+## 6. Admin Portal (admin.billdost.in)
+
+The portal is a SECOND app in this repo, in the top-level `admin/`
+folder (the shop app stays in `billdost/`; the two share nothing at
+runtime except the same Supabase project). It is the control centre:
+applications, shop setup, activation links, issues, broadcasts,
+finance lite, team and audit log. Full operating notes live in
+`admin/README.md`; this section is only the deploy delta.
+
+### 6.1 Database
+
+Apply migrations `0017` to `0021` with the section 2 flow, after
+`0001` to `0016`. They add `access_requests`, `admin_users`,
+`admin_audit_log`, `activation_tokens`, `announcements`,
+`broadcast_log`, `shop_support_notes` and `platform_settings`, the
+`shops.status` lifecycle (existing shops land on `live`), the
+finance-lite plan columns, the Issue Centre fields on
+`client_errors`, and the admin RPCs. All new tables are service-role
+only: no browser, shop or portal, ever reads them with the anon key.
+
+### 6.2 Vercel: a second project
+
+1. Vercel dashboard, Add New, Project: import this same repo again
+   as a separate project (name it `billdost-admin`). Root Directory
+   is `admin`, framework preset Next.js. It deploys from the same
+   branch flow as section 3.
+2. Environment variables (Production and Preview):
+   `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   (the SAME project values as section 1),
+   `SUPABASE_SERVICE_ROLE_KEY` (the same secret; server only, this
+   is the portal's reason to exist, guard it),
+   `NEXT_PUBLIC_SHOP_APP_URL` = `https://app.billdost.in`,
+   `NEXT_PUBLIC_ADMIN_URL` = `https://admin.billdost.in`,
+   `NEXT_PUBLIC_LANDING_URL` = `https://billdost.in`, and the
+   WhatsApp platform keys from section 4 (`WHATSAPP_CLOUD_API_TOKEN`,
+   `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`) plus
+   optional `WHATSAPP_TEMPLATE_ACTIVATION` (default
+   `billdost_activation_v1`) and `WHATSAPP_TEMPLATE_BROADCAST`
+   (default `billdost_announcement_v1`).
+3. Deploy a Preview first and smoke test: portal login rejects a
+   shop login, the founder login reaches the dashboard.
+
+### 6.3 DNS and domains
+
+- `app.billdost.in`: CNAME to the shop app Vercel project (the
+  section 3 project). Set `NEXT_PUBLIC_APP_URL` there to
+  `https://app.billdost.in` when you make this move.
+- `admin.billdost.in`: CNAME to the `billdost-admin` Vercel project.
+- `billdost.in` (apex): the landing site with the Request Access
+  form. The form endpoint inserts into `access_requests` with the
+  service role (server-side only, with honeypot and rate limiting).
+
+### 6.4 Supabase Auth settings for activation
+
+In the Supabase dashboard, Authentication, URL Configuration:
+
+- Site URL: `https://app.billdost.in`
+- Redirect URLs, add: `https://app.billdost.in/auth/callback`,
+  `https://app.billdost.in/activate/*`,
+  `https://admin.billdost.in/login`, and the two Preview URLs while
+  testing. The activation page itself is public by design: the
+  unguessable token in the link is the credential, checked
+  server-side against its stored hash.
+
+### 6.5 Seed the founder, then test the whole story once
+
+1. Supabase dashboard, Authentication, Users: add the founder's
+   email with a password (this is the only portal account created
+   by hand).
+2. SQL editor: insert one row into `admin_users` with that user's
+   id as `auth_user_id`, role `founder`, status `active` (exact SQL
+   is in `admin/README.md`).
+3. End-to-end smoke test, in order: submit the landing Request
+   Access form, see it in the portal inbox, mark Called, Approve,
+   Set up the shop from the request, send the activation link to
+   your own phone, open it, set a password, land inside the ready
+   shop, and confirm the audit log shows every step. Then create one
+   invoice in the shop and watch the dashboard numbers move.

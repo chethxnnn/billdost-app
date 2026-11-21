@@ -24,8 +24,7 @@ export async function GET(request: Request) {
         // Invited staff first (blueprint B.9, C4): if this user has a
         // pending staff invite, accept_staff_invite flips the row to
         // active and returns the shop. This ordering is what stops
-        // invited staff being bounced into onboarding to create their
-        // own shop.
+        // invited staff being pushed to create their own shop.
         const { data: invitedShopId } = await supabase.rpc('accept_staff_invite')
         if (invitedShopId) {
           return NextResponse.redirect(`${origin}${next}`)
@@ -37,9 +36,10 @@ export async function GET(request: Request) {
           .eq('owner_id', user.id)
           .single()
 
-        // No shop yet or onboarding not done → send to onboarding
+        // No shop yet or setup not done: BillDost is invite-only, so
+        // there is no self-serve onboarding. The no-shop page explains.
         if (!shop || !shop.onboarding_done) {
-          return NextResponse.redirect(`${origin}/onboarding`)
+          return NextResponse.redirect(`${origin}/no-shop`)
         }
       }
 

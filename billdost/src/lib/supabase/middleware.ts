@@ -42,8 +42,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/activity') ||
     request.nextUrl.pathname.startsWith('/reports') ||
     request.nextUrl.pathname.startsWith('/analytics') ||
-    request.nextUrl.pathname.startsWith('/settings') ||
-    request.nextUrl.pathname.startsWith('/onboarding')
+    request.nextUrl.pathname.startsWith('/settings')
 
   if (!user && isDashboardPage) {
     const url = request.nextUrl.clone()

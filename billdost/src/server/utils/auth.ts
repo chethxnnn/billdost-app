@@ -4,7 +4,7 @@ import { TRPCError } from '@trpc/server'
  * Core function to resolve shop and role.
  */
 const SHOP_CONTEXT_COLUMNS =
-  'id, name, category, state, state_code, gstin, is_gst_registered, invoice_prefix, invoice_counter, quotation_prefix, quotation_counter, owner_id, onboarding_done, plan, language'
+  'id, name, category, state, state_code, gstin, is_gst_registered, invoice_prefix, invoice_counter, quotation_prefix, quotation_counter, owner_id, onboarding_done, plan, language, status'
 
 export async function resolveShopAndRole(supabase: any, userId: string) {
   const { data: shopAsOwner } = await supabase

@@ -715,4 +715,308 @@ begin
 end;
 $$;
 
+-- ASSERT: admin_create_shop_requires_active_admin
+do $$
+declare
+  v_code text;
+  v_accepted boolean;
+  v_payload jsonb := '{"shop_name":"Guard Test","owner_name":"G","owner_mobile":"9000000001"}'::jsonb;
+begin
+  insert into auth.users (id, email) values
+    ('aaaaaaaa-0000-0000-0000-000000000001', 'founder@billdost.test'),
+    ('aaaaaaaa-0000-0000-0000-000000000002', 'finance@billdost.test'),
+    ('aaaaaaaa-0000-0000-0000-000000000003', 'disabled@billdost.test')
+  on conflict (id) do nothing;
+  insert into public.admin_users (id, auth_user_id, display_name, email, role, status) values
+    ('a1111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'Founder', 'founder@billdost.test', 'founder', 'active'),
+    ('a1111111-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000002', 'Finance', 'finance@billdost.test', 'finance', 'active'),
+    ('a1111111-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000003', 'Disabled', 'disabled@billdost.test', 'founder', 'disabled')
+  on conflict (id) do nothing;
+
+  -- Unknown admin id.
+  v_accepted := false; v_code := null;
+  begin
+    perform public.admin_create_shop_tx('a9999999-0000-0000-0000-000000000009', v_payload);
+    v_accepted := true;
+  exception when others then v_code := sqlstate;
+  end;
+  if v_accepted or v_code <> '28000' then
+    raise exception 'ASSERT FAIL admin guard: unknown admin accepted or wrong code %', v_code;
+  end if;
+
+  -- Finance role may not create shops.
+  v_accepted := false; v_code := null;
+  begin
+    perform public.admin_create_shop_tx('a1111111-0000-0000-0000-000000000002', v_payload);
+    v_accepted := true;
+  exception when others then v_code := sqlstate;
+  end;
+  if v_accepted or v_code <> '42501' then
+    raise exception 'ASSERT FAIL admin guard: finance admin accepted or wrong code %', v_code;
+  end if;
+
+  -- Disabled admin may not create shops.
+  v_accepted := false; v_code := null;
+  begin
+    perform public.admin_create_shop_tx('a1111111-0000-0000-0000-000000000003', v_payload);
+    v_accepted := true;
+  exception when others then v_code := sqlstate;
+  end;
+  if v_accepted or v_code <> '28000' then
+    raise exception 'ASSERT FAIL admin guard: disabled admin accepted or wrong code %', v_code;
+  end if;
+end;
+$$;
+
+-- ASSERT: admin_create_shop_happy_path
+do $$
+declare
+  v_shop uuid;
+  v_status text;
+  v_owner uuid;
+  v_login text;
+  v_staff_status text;
+  v_products int;
+  v_req_status text;
+  v_req_shop uuid;
+  v_audit int;
+begin
+  insert into public.access_requests (id, shop_name, owner_name, whatsapp_number, category, city, status)
+  values ('cccccccc-0000-0000-0000-000000000001', 'Ramdev Kirana', 'Ramdev Ji', '919876543210', 'kirana', 'Jaipur', 'approved');
+
+  v_shop := public.admin_create_shop_tx(
+    'a1111111-0000-0000-0000-000000000001',
+    jsonb_build_object(
+      'shop_name', 'Ramdev Kirana',
+      'category', 'kirana',
+      'address', 'Main Bazaar, Jaipur',
+      'owner_name', 'Ramdev Ji',
+      'owner_mobile', '+91 98765 43210',
+      'request_id', 'cccccccc-0000-0000-0000-000000000001',
+      'products', jsonb_build_array(
+        jsonb_build_object('name', 'Atta 10kg', 'price', 425, 'unit', 'piece'),
+        jsonb_build_object('name', 'Sugar 1kg', 'price', 45, 'unit', 'piece')
+      ),
+      'staff', jsonb_build_array(
+        jsonb_build_object('name', 'Helper One', 'phone', '9000000002', 'role', 'billing')
+      )
+    )
+  );
+
+  select status, owner_id into v_status, v_owner from public.shops where id = v_shop;
+  if v_status <> 'pending_activation' then
+    raise exception 'ASSERT FAIL admin create: shop status %, expected pending_activation', v_status;
+  end if;
+  if v_owner is not null then
+    raise exception 'ASSERT FAIL admin create: owner_id must be NULL before activation';
+  end if;
+
+  select email, status into v_login, v_staff_status
+  from public.staff_members where shop_id = v_shop and role = 'owner';
+  if v_login <> '9876543210@billdost.in' then
+    raise exception 'ASSERT FAIL admin create: login email %, expected generated mobile id', v_login;
+  end if;
+  if v_staff_status <> 'invited' then
+    raise exception 'ASSERT FAIL admin create: owner staff status %, expected invited', v_staff_status;
+  end if;
+
+  select count(*) into v_products from public.products where shop_id = v_shop;
+  if v_products <> 2 then
+    raise exception 'ASSERT FAIL admin create: products %, expected 2', v_products;
+  end if;
+
+  select status, converted_shop_id into v_req_status, v_req_shop
+  from public.access_requests where id = 'cccccccc-0000-0000-0000-000000000001';
+  if v_req_status <> 'setup_done' or v_req_shop <> v_shop then
+    raise exception 'ASSERT FAIL admin create: request not moved to setup_done with shop link';
+  end if;
+
+  select count(*) into v_audit from public.admin_audit_log
+  where shop_id = v_shop and action = 'shop_created';
+  if v_audit <> 1 then
+    raise exception 'ASSERT FAIL admin create: audit rows %, expected 1', v_audit;
+  end if;
+
+  insert into harness_state (k, v) values ('admin_shop_1', v_shop)
+  on conflict (k) do update set v = excluded.v;
+end;
+$$;
+
+-- ASSERT: activation_issue_and_replace
+do $$
+declare
+  v_shop uuid;
+  v_state text;
+  v_code text;
+  v_accepted boolean;
+begin
+  select v into v_shop from harness_state where k = 'admin_shop_1';
+  if v_shop is null then
+    raise exception 'ASSERT FAIL activation: admin_shop_1 fixture missing';
+  end if;
+
+  perform public.admin_issue_activation_tx(
+    'a1111111-0000-0000-0000-000000000001', v_shop, 'hash-a', 'manual');
+  v_state := public.activation_lookup('hash-a') ->> 'state';
+  if v_state <> 'valid' then
+    raise exception 'ASSERT FAIL activation: first token state %, expected valid', v_state;
+  end if;
+
+  perform public.admin_issue_activation_tx(
+    'a1111111-0000-0000-0000-000000000001', v_shop, 'hash-b', 'whatsapp');
+  v_state := public.activation_lookup('hash-a') ->> 'state';
+  if v_state <> 'replaced' then
+    raise exception 'ASSERT FAIL activation: old token state %, expected replaced', v_state;
+  end if;
+
+  v_accepted := false; v_code := null;
+  begin
+    perform public.activation_consume_tx('hash-a', 'bbbbbbbb-0000-0000-0000-000000000001');
+    v_accepted := true;
+  exception when others then v_code := sqlstate;
+  end;
+  if v_accepted then
+    raise exception 'ASSERT FAIL activation: replaced token was consumed';
+  end if;
+end;
+$$;
+
+-- ASSERT: activation_consume_happy_path
+do $$
+declare
+  v_shop uuid;
+  v_returned uuid;
+  v_status text;
+  v_owner uuid;
+  v_staff_status text;
+  v_staff_user uuid;
+  v_used timestamptz;
+  v_req_status text;
+  v_audit int;
+  v_lookup jsonb;
+begin
+  select v into v_shop from harness_state where k = 'admin_shop_1';
+  insert into auth.users (id, email)
+  values ('bbbbbbbb-0000-0000-0000-000000000001', '9876543210@billdost.in')
+  on conflict (id) do nothing;
+
+  v_lookup := public.activation_lookup('hash-b');
+  if v_lookup ->> 'state' <> 'valid' then
+    raise exception 'ASSERT FAIL consume: lookup state %, expected valid', v_lookup ->> 'state';
+  end if;
+  if v_lookup ->> 'login_email' <> '9876543210@billdost.in' then
+    raise exception 'ASSERT FAIL consume: lookup login email %', v_lookup ->> 'login_email';
+  end if;
+
+  v_returned := public.activation_consume_tx('hash-b', 'bbbbbbbb-0000-0000-0000-000000000001');
+  if v_returned <> v_shop then
+    raise exception 'ASSERT FAIL consume: returned shop % does not match', v_returned;
+  end if;
+
+  select status, owner_id into v_status, v_owner from public.shops where id = v_shop;
+  if v_status <> 'live' or v_owner <> 'bbbbbbbb-0000-0000-0000-000000000001' then
+    raise exception 'ASSERT FAIL consume: shop not live with owner set';
+  end if;
+
+  select status, user_id into v_staff_status, v_staff_user
+  from public.staff_members where shop_id = v_shop and role = 'owner';
+  if v_staff_status <> 'active' or v_staff_user <> 'bbbbbbbb-0000-0000-0000-000000000001' then
+    raise exception 'ASSERT FAIL consume: owner staff row not activated';
+  end if;
+
+  select used_at into v_used from public.activation_tokens where token_hash = 'hash-b';
+  if v_used is null then
+    raise exception 'ASSERT FAIL consume: token not marked used';
+  end if;
+
+  select status into v_req_status from public.access_requests
+  where id = 'cccccccc-0000-0000-0000-000000000001';
+  if v_req_status <> 'live' then
+    raise exception 'ASSERT FAIL consume: request status %, expected live', v_req_status;
+  end if;
+
+  select count(*) into v_audit from public.admin_audit_log
+  where shop_id = v_shop and action = 'shop_activated';
+  if v_audit <> 1 then
+    raise exception 'ASSERT FAIL consume: shop_activated audit rows %, expected 1', v_audit;
+  end if;
+end;
+$$;
+
+-- ASSERT: activation_single_use
+do $$
+declare
+  v_code text;
+  v_accepted boolean := false;
+  v_state text;
+begin
+  begin
+    perform public.activation_consume_tx('hash-b', 'bbbbbbbb-0000-0000-0000-000000000001');
+    v_accepted := true;
+  exception when others then v_code := sqlstate;
+  end;
+  if v_accepted then
+    raise exception 'ASSERT FAIL single use: token consumed twice';
+  end if;
+  v_state := public.activation_lookup('hash-b') ->> 'state';
+  if v_state <> 'used' then
+    raise exception 'ASSERT FAIL single use: lookup state %, expected used', v_state;
+  end if;
+end;
+$$;
+
+-- ASSERT: activation_expired_rejected
+do $$
+declare
+  v_shop uuid;
+  v_state text;
+  v_accepted boolean := false;
+begin
+  v_shop := public.admin_create_shop_tx(
+    'a1111111-0000-0000-0000-000000000001',
+    '{"shop_name":"Expiry Test","owner_name":"E","owner_mobile":"9000000003"}'::jsonb
+  );
+  perform public.admin_issue_activation_tx(
+    'a1111111-0000-0000-0000-000000000001', v_shop, 'hash-c', 'manual');
+  update public.activation_tokens
+  set expires_at = now() - interval '1 hour'
+  where token_hash = 'hash-c';
+
+  v_state := public.activation_lookup('hash-c') ->> 'state';
+  if v_state <> 'expired' then
+    raise exception 'ASSERT FAIL expiry: lookup state %, expected expired', v_state;
+  end if;
+
+  begin
+    perform public.activation_consume_tx('hash-c', 'bbbbbbbb-0000-0000-0000-000000000001');
+    v_accepted := true;
+  exception when others then null;
+  end;
+  if v_accepted then
+    raise exception 'ASSERT FAIL expiry: expired token was consumed';
+  end if;
+end;
+$$;
+
+-- ASSERT: activation_invalid_hash
+do $$
+declare
+  v_state text;
+  v_accepted boolean := false;
+begin
+  v_state := public.activation_lookup('no-such-hash') ->> 'state';
+  if v_state <> 'invalid' then
+    raise exception 'ASSERT FAIL invalid: lookup state %, expected invalid', v_state;
+  end if;
+  begin
+    perform public.activation_consume_tx('no-such-hash', 'bbbbbbbb-0000-0000-0000-000000000001');
+    v_accepted := true;
+  exception when others then null;
+  end;
+  if v_accepted then
+    raise exception 'ASSERT FAIL invalid: unknown token was consumed';
+  end if;
+end;
+$$;
+
 select 'HARNESS_ASSERTIONS_COMPLETE' as pass_marker;
