@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
     const supabase = createClient()
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     })
 
     if (resetError) {
@@ -43,20 +43,20 @@ export default function ForgotPasswordPage() {
         >
           Reset link bhej diya! ✅
         </h1>
-        <p className="text-[#9A9690] text-sm mb-6 max-w-xs mx-auto">
+        <p className="text-[#98989D] text-sm mb-6 max-w-xs mx-auto">
           <strong className="text-white">{email}</strong> pe reset link bheja hai.
           Link pe click karo aur naya password set karo.
         </p>
         <div className="flex gap-3">
           <button
             onClick={() => { setSent(false); setEmail(''); }}
-            className="flex-1 py-3 bg-[#1E1C1A] border border-[#2E2C28] text-[#9A9690] rounded-xl text-sm hover:bg-[#252320] transition-colors"
+            className="flex-1 py-3 bg-[#2C2C2E] border border-[#38383A] text-[#98989D] rounded-xl text-sm hover:bg-[#2C2C2E] transition-colors"
           >
             Doosra email try karo
           </button>
           <Link
             href="/login"
-            className="flex-1 py-3 bg-[#2BB673] text-white rounded-xl text-sm font-semibold text-center hover:bg-[#22A862] transition-colors"
+            className="flex-1 py-3 bg-[#25D366] text-white rounded-xl text-sm font-semibold text-center hover:bg-[#22A862] transition-colors"
           >
             Login Karo →
           </Link>
@@ -75,16 +75,16 @@ export default function ForgotPasswordPage() {
         >
           Password bhool gaye? 🔐
         </h1>
-        <p className="text-[#9A9690] text-sm">
+        <p className="text-[#98989D] text-sm">
           Koi baat nahi. Email daalo, reset link bhej denge.
         </p>
       </div>
 
       {/* Form */}
-      <div className="bg-[#161513] border border-[#2E2C28] rounded-2xl p-6">
+      <div className="bg-[#1C1C1E] border border-[#38383A] rounded-2xl p-6">
         <form onSubmit={handleReset} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[#9A9690] mb-1.5 tracking-wide">
+            <label className="block text-xs font-medium text-[#98989D] mb-1.5 tracking-wide">
               Registered Email
             </label>
             <input
@@ -93,7 +93,7 @@ export default function ForgotPasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="aapka@email.com"
               required
-              className="w-full px-4 py-3 bg-[#1E1C1A] border border-[#2E2C28] rounded-xl text-white text-sm placeholder:text-[#5C5A56] outline-none focus:border-[#2BB673] transition-colors"
+              className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#38383A] rounded-xl text-white text-sm placeholder:text-[#6E6E73] outline-none focus:border-[#25D366] transition-colors"
             />
           </div>
 
@@ -106,7 +106,7 @@ export default function ForgotPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-[#2BB673] hover:bg-[#22A862] disabled:bg-[#1A6E45] disabled:cursor-wait text-white font-semibold rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2"
+            className="w-full py-3 bg-[#25D366] hover:bg-[#22A862] disabled:bg-[#1A6E45] disabled:cursor-wait text-white font-semibold rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
@@ -121,11 +121,11 @@ export default function ForgotPasswordPage() {
       </div>
 
       {/* Back to login */}
-      <p className="text-center text-sm text-[#9A9690] mt-6">
+      <p className="text-center text-sm text-[#98989D] mt-6">
         Password yaad aa gaya?{' '}
         <Link
           href="/login"
-          className="text-[#2BB673] font-medium hover:text-[#22A862] transition-colors"
+          className="text-[#25D366] font-medium hover:text-[#22A862] transition-colors"
         >
           Login Karo →
         </Link>

@@ -6,6 +6,7 @@ interface ShopContextType {
   shopId: string
   shopCategory: string
   shopName: string
+  role: string
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined)
@@ -15,14 +16,16 @@ export function ShopProvider({
   shopId,
   shopCategory,
   shopName,
+  role = 'owner',
 }: {
   children: React.ReactNode
   shopId: string
   shopCategory: string
   shopName: string
+  role?: string
 }) {
   return (
-    <ShopContext.Provider value={{ shopId, shopCategory: (shopCategory || '').toLowerCase(), shopName }}>
+    <ShopContext.Provider value={{ shopId, shopCategory: (shopCategory || '').toLowerCase(), shopName, role }}>
       {children}
     </ShopContext.Provider>
   )

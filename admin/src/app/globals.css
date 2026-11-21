@@ -1,0 +1,231 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/*
+  BillDost Admin Portal design system (Dock + Canvas, approved Nov 22).
+  Ground #F5F5F7, ink #1D1D1F, one accent: BillDost green #1B7A4A
+  (dark: #25D366). Cards are white with hairline borders and a 20px
+  radius on ONE padding scale; every card row shares a fixed leading
+  tile or avatar column, content on shared baselines, and trailing
+  values right-aligned in tabular numbers. Frosted material lives
+  only on the header, the dock and overlays. Motion is transform and
+  opacity only, spring cubic-bezier(.32,.72,.24,1), under 300ms. The
+  theme is a manual per-user choice: light by default, dark only when
+  the admin picks it. Nothing follows the OS setting.
+*/
+
+:root {
+  --spring: cubic-bezier(0.32, 0.72, 0.24, 1);
+  /* The frosted shell header is exactly 60px tall (Shell.tsx). Every
+     sticky element in the portal pins against this one variable, so
+     the pattern can never drift out of sync with the header. */
+  --header-h: 60px;
+  /* Height of the Pipeline control bar (filters + search), which is
+     itself sticky; Pipeline list group heads pin below it. The bar
+     is built to a fixed height: its chips scroll horizontally
+     instead of wrapping, at every width. */
+  --pipeline-bar-h: 126px;
+}
+
+/*
+  Sticky pattern (the KPMG feel, Nov 22): some things pin while the
+  rest scrolls, and every pinned thing stops at the end of its own
+  section or card. Pure CSS position: sticky, no scroll listeners.
+  Pinned elements wear the frosted material so content scrolling
+  beneath them reads correctly.
+*/
+
+/* A full-width bar that pins under the shell header: detail page
+   titles, the Pipeline control bar. */
+.sticky-bar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 30;
+  background: rgba(245, 245, 247, 0.85);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .sticky-bar {
+  background: rgba(0, 0, 0, 0.72);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+/* A group header in a grouped list: pins under the header while its
+   group scrolls, then the next group pushes it away. */
+.sticky-group-head {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 20;
+  background: rgba(245, 245, 247, 0.85);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.dark .sticky-group-head {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* Same, but for Pipeline list groups, which pin below the sticky
+   Pipeline control bar instead of the shell header. */
+.sticky-group-head-pipeline {
+  top: calc(var(--header-h) + var(--pipeline-bar-h));
+}
+
+/* A header row inside a card (Today's attention queue): pins under
+   the shell header while the card's rows scroll beneath it, and
+   releases at the card's bottom edge. */
+.sticky-card-head {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .sticky-card-head {
+  background: rgba(28, 28, 30, 0.88);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2 {
+  letter-spacing: -0.02em;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: page-enter 240ms var(--spring) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fade-in 200ms ease-out both;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.pop-in {
+  animation: pop-in 220ms var(--spring) both;
+}
+
+/* Profile popover: grows out of the avatar, top right. */
+@keyframes pop-in-tr {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.pop-in-tr {
+  transform-origin: top right;
+  animation: pop-in-tr 240ms var(--spring) both;
+}
+
+/* Bottom sheet (More menu on phones): rises from the dock. */
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sheet-up {
+  animation: sheet-up 260ms var(--spring) both;
+}
+
+/* Dock entrance: settles up into place once per shell mount.
+   Only the Y axis animates here. The dock's horizontal centring
+   lives in Tailwind's translate utility (the native CSS translate
+   property); putting a -50% X into these keyframes as well stacked
+   the two shifts and parked the dock half its own width left of
+   centre, permanently, because the fill mode keeps the last
+   keyframe. Never put an X translation in this animation. */
+@keyframes dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dock-in {
+  animation: dock-in 320ms var(--spring) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .fade-in,
+  .pop-in,
+  .pop-in-tr,
+  .sheet-up,
+  .dock-in {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Roomy, calm scrollbars that never shout. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 120, 128, 0.35) transparent;
+}

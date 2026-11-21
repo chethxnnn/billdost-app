@@ -36,8 +36,8 @@ function MLForecastWidget({
           <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
             Sales Forecast (Next 7 Days)
           </h3>
-          <p className="text-[12px] font-medium text-[#86868B] dark:text-[#98989D]">
-            Powered by Local Math Model
+          <p className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D]">
+            Pichhle sales ke hisaab se andaaz
           </p>
         </div>
       </div>
@@ -50,7 +50,7 @@ function MLForecastWidget({
         </div>
       ) : !data || data.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <p className="text-[13px] text-[#86868B] dark:text-[#98989D]">Not enough sales history to forecast.</p>
+          <p className="text-[13px] text-[#6E6E73] dark:text-[#98989D]">Not enough sales history to forecast.</p>
         </div>
       ) : (
         <div className="space-y-3 flex-1 overflow-y-auto pr-2 scrollbar-none">
@@ -65,9 +65,9 @@ function MLForecastWidget({
               <div className="flex-1 min-w-0 z-10">
                 <div className="flex justify-between items-center mb-1">
                   <div className="text-[14px] font-bold text-[#1D1D1F] dark:text-[#F5F5F7] truncate pr-2">{item.productName}</div>
-                  <div className="text-[16px] font-black text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">{item.predictedQuantity} <span className="text-[10px] text-[#86868B] dark:text-[#98989D] font-medium">units</span></div>
+                  <div className="text-[16px] font-black text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">{item.predictedQuantity} <span className="text-[10px] text-[#6E6E73] dark:text-[#98989D] font-medium">units</span></div>
                 </div>
-                <p className="text-[11px] text-[#86868B] dark:text-[#98989D] leading-snug">{item.reason}</p>
+                <p className="text-[11px] text-[#6E6E73] dark:text-[#98989D] leading-snug">{item.reason}</p>
               </div>
             </div>
           ))}
@@ -94,7 +94,7 @@ function TopCustomersWidget({
           <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] tracking-tight">
             Top Customers
           </h3>
-          <p className="text-[13px] font-medium text-[#86868B] dark:text-[#98989D]">
+          <p className="text-[13px] font-medium text-[#6E6E73] dark:text-[#98989D]">
             By total billed amount
           </p>
         </div>
@@ -110,7 +110,7 @@ function TopCustomersWidget({
             </div>
           ))
         ) : !data || data.length === 0 ? (
-          <div className="text-center text-[13px] text-[#86868B] dark:text-[#98989D]">No customers found.</div>
+          <div className="text-center text-[13px] text-[#6E6E73] dark:text-[#98989D]">No customers found.</div>
         ) : (
           data.map((c, i) => {
             const val = Number(c.total_billed || 0)
@@ -119,7 +119,7 @@ function TopCustomersWidget({
               <div key={i} className="w-full relative group">
                 <div className="flex justify-between items-end mb-1.5">
                   <span className="text-[13px] font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] truncate pr-4">{c.name}</span>
-                  <span className="text-[12px] font-bold text-[#86868B] dark:text-[#98989D]">{formatINR(val)}</span>
+                  <span className="text-[12px] font-bold text-[#6E6E73] dark:text-[#98989D]">{formatINR(val)}</span>
                 </div>
                 <div className="h-2 w-full bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
                   <div 
@@ -150,33 +150,33 @@ export default function AnalyticsPage() {
         <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
           Business Insights 📊
         </h1>
-        <p className="text-sm text-gray-400 dark:text-[#5C5A56] mt-0.5">
+        <p className="text-sm text-gray-400 dark:text-[#98989D] mt-0.5">
           Apne business ki progress yahan dekhiye
         </p>
       </div>
 
       {/* Top Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-5 rounded-2xl ios-shadow">
-          <div className="text-xs font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">Today's Revenue</div>
+        <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-5 rounded-2xl ios-shadow">
+          <div className="text-xs font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">Today's Revenue</div>
           <div className="text-2xl font-black text-[#1B7A4A] dark:text-[#25D366]">
             {ovLoading ? '...' : formatINR(overview?.todayRevenue || 0)}
           </div>
         </div>
-        <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-5 rounded-2xl ios-shadow">
-          <div className="text-xs font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">Pending Amount</div>
+        <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-5 rounded-2xl ios-shadow">
+          <div className="text-xs font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">Pending Amount</div>
           <div className="text-2xl font-black text-red-500">
             {ovLoading ? '...' : formatINR(overview?.pendingAmount || 0)}
           </div>
         </div>
-        <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-5 rounded-2xl ios-shadow">
-          <div className="text-xs font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">Bills Today</div>
+        <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-5 rounded-2xl ios-shadow">
+          <div className="text-xs font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">Bills Today</div>
           <div className="text-2xl font-black text-gray-900 dark:text-white">
             {ovLoading ? '...' : overview?.billsSentToday || 0}
           </div>
         </div>
-        <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-5 rounded-2xl ios-shadow">
-          <div className="text-xs font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">New Customers</div>
+        <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-5 rounded-2xl ios-shadow">
+          <div className="text-xs font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">New Customers</div>
           <div className="text-2xl font-black text-blue-500">
             {ovLoading ? '...' : overview?.newCustomersThisWeek || 0}
           </div>
@@ -185,10 +185,10 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Revenue Trends Chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-6 rounded-3xl ios-shadow">
+        <div className="lg:col-span-2 bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-6 rounded-3xl ios-shadow">
           <div className="mb-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Revenue Trends</h3>
-            <p className="text-sm text-gray-400 dark:text-[#5C5A56]">Last 6 months</p>
+            <p className="text-sm text-gray-400 dark:text-[#98989D]">Last 6 months</p>
           </div>
           
           <div className="h-[300px] w-full">
@@ -199,12 +199,12 @@ export default function AnalyticsPage() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={trends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2E2C28" opacity={0.2} />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#86868B' }} dy={10} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#38383A" opacity={0.2} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6E6E73' }} dy={10} />
                   <YAxis 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#86868B' }}
+                    tick={{ fontSize: 12, fill: '#6E6E73' }}
                     tickFormatter={(val) => `₹${val >= 1000 ? (val/1000).toFixed(1)+'k' : val}`}
                     dx={-10}
                   />
@@ -221,10 +221,10 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Top Products */}
-        <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-6 rounded-3xl ios-shadow flex flex-col">
+        <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-6 rounded-3xl ios-shadow flex flex-col">
           <div className="mb-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Top Items</h3>
-            <p className="text-sm text-gray-400 dark:text-[#5C5A56]">Highest revenue generators</p>
+            <p className="text-sm text-gray-400 dark:text-[#98989D]">Highest revenue generators</p>
           </div>
 
           <div className="flex-1 flex flex-col justify-center">
@@ -241,12 +241,12 @@ export default function AnalyticsPage() {
                 {topProducts.map((p, idx) => (
                   <div key={p.name} className="flex items-center justify-between group">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-[#1E1C1A] flex items-center justify-center text-xs font-bold text-gray-500 dark:text-[#9A9690] border border-gray-100 dark:border-[#2E2C28] group-hover:scale-110 transition-transform">
+                      <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-[#2C2C2E] flex items-center justify-center text-xs font-bold text-gray-500 dark:text-[#98989D] border border-gray-100 dark:border-[#38383A] group-hover:scale-110 transition-transform">
                         #{idx + 1}
                       </div>
                       <div>
                         <div className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[120px]">{p.name}</div>
-                        <div className="text-xs font-medium text-gray-400 dark:text-[#5C5A56]">{p.qty} sold</div>
+                        <div className="text-xs font-medium text-gray-400 dark:text-[#98989D]">{p.qty} sold</div>
                       </div>
                     </div>
                     <div className="text-sm font-black text-[#1B7A4A] dark:text-[#25D366]">

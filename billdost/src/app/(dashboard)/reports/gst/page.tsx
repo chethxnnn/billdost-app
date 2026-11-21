@@ -60,7 +60,7 @@ export default function GstReportPage() {
           <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             Tax & CA Report
           </h1>
-          <p className="text-sm text-gray-400 dark:text-[#5C5A56] mt-0.5">
+          <p className="text-sm text-gray-400 dark:text-[#98989D] mt-0.5">
             CA-ready format for your GST filings
           </p>
         </div>
@@ -71,14 +71,14 @@ export default function GstReportPage() {
               type="date" 
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="px-4 py-2 bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm"
+              className="px-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm"
             />
             <span className="self-center text-gray-400">to</span>
             <input 
               type="date" 
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="px-4 py-2 bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm"
+              className="px-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm"
             />
           </div>
           
@@ -86,7 +86,7 @@ export default function GstReportPage() {
             <div className="flex gap-2">
               <button 
                 onClick={handleExportCSV}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] hover:bg-gray-50 dark:hover:bg-[#1E1C1A] text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-colors"
               >
                 <Download className="w-4 h-4" /> CSV
               </button>
@@ -112,33 +112,33 @@ export default function GstReportPage() {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-4 rounded-2xl ios-shadow">
-              <div className="text-[10px] font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">Total Bills Value</div>
+            <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-4 rounded-2xl ios-shadow">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">Total Bills Value</div>
               <div className="text-lg font-black text-gray-900 dark:text-white">{formatINR(data.summary.totalRevenue)}</div>
             </div>
-            <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-4 rounded-2xl ios-shadow">
-              <div className="text-[10px] font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">Taxable Amount</div>
+            <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-4 rounded-2xl ios-shadow">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">Taxable Amount</div>
               <div className="text-lg font-black text-blue-600 dark:text-blue-400">{formatINR(data.summary.totalTaxable)}</div>
             </div>
-            <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-4 rounded-2xl ios-shadow">
-              <div className="text-[10px] font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">CGST Total</div>
+            <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-4 rounded-2xl ios-shadow">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">CGST Total</div>
               <div className="text-lg font-black text-orange-600 dark:text-orange-400">{formatINR(data.summary.totalCgst)}</div>
             </div>
-            <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-4 rounded-2xl ios-shadow">
-              <div className="text-[10px] font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">SGST Total</div>
+            <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-4 rounded-2xl ios-shadow">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">SGST Total</div>
               <div className="text-lg font-black text-[#1B7A4A] dark:text-[#25D366]">{formatINR(data.summary.totalSgst)}</div>
             </div>
-            <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] p-4 rounded-2xl ios-shadow">
-              <div className="text-[10px] font-bold text-gray-400 dark:text-[#5C5A56] uppercase tracking-wider mb-1">IGST Total</div>
+            <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-4 rounded-2xl ios-shadow">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-[#98989D] uppercase tracking-wider mb-1">IGST Total</div>
               <div className="text-lg font-black text-purple-600 dark:text-purple-400">{formatINR(data.summary.totalIgst)}</div>
             </div>
           </div>
 
           {/* Table */}
-          <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl overflow-hidden ios-shadow">
+          <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl overflow-hidden ios-shadow">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 dark:bg-[#1E1C1A] text-xs font-bold text-gray-500 dark:text-[#9A9690] uppercase tracking-wider">
+                <thead className="bg-gray-50 dark:bg-[#2C2C2E] text-xs font-bold text-gray-500 dark:text-[#98989D] uppercase tracking-wider">
                   <tr>
                     <th className="p-4">Date</th>
                     <th className="p-4">Invoice #</th>
@@ -150,7 +150,7 @@ export default function GstReportPage() {
                     <th className="p-4 text-right">Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-[#2E2C28]">
+                <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
                   {data.invoices.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-gray-400">Is date range mein koi bills nahi hain.</td>

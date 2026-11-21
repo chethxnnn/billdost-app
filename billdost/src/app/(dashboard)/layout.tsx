@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveShopAndRole } from '@/server/utils/auth'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 
-import { Chatbot } from '@/components/Chatbot'
+import { ChatbotLazy } from '@/components/ChatbotLazy'
 
 export default async function DashboardLayout({
   children,
@@ -24,13 +24,22 @@ export default async function DashboardLayout({
     shop = res.shop
     role = res.role
   } catch (err) {
-    // If they have no shop access at all, send to onboarding
-    redirect('/onboarding')
+    // No shop access at all. BillDost is invite-only: shops are created
+    // by the BillDost team from the admin portal, so there is no
+    // self-serve onboarding to send anyone to. The no-shop page
+    // explains the state calmly.
+    redirect('/no-shop')
   }
 
   // Double check onboarding done
   if (!shop || !shop.onboarding_done) {
-    redirect('/onboarding')
+    redirect('/no-shop')
+  }
+
+  // A suspended shop keeps its data but cannot be used until the
+  // BillDost team reactivates it (Admin Portal plan, Section 3).
+  if (shop.status === 'suspended') {
+    redirect('/no-shop?suspended=1')
   }
 
   return (
@@ -39,13 +48,14 @@ export default async function DashboardLayout({
         shopId={shop.id}
         shopName={shop.name}
         shopCategory={shop.category}
+        shopLanguage={shop.language}
         userEmail={user.email || ''}
         userName={user.user_metadata?.full_name || shop.name}
         role={role}
       >
         {children}
       </DashboardShell>
-      <Chatbot />
+      <ChatbotLazy />
     </>
   )
 }

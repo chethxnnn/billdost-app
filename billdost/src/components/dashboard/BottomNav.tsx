@@ -2,17 +2,19 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-
-const ITEMS = [
-  { label: 'Home', href: '/dashboard', icon: HomeIcon },
-  { label: 'Invoices', href: '/invoices', icon: InvoiceIcon },
-  { label: 'Bill', href: '/invoices/new', icon: PlusIcon, center: true },
-  { label: 'Customers', href: '/customers', icon: CustomersIcon },
-  { label: 'More', href: '/settings', icon: MoreIcon },
-]
+import { useTranslation } from '@/lib/i18n/useTranslation'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const { t } = useTranslation()
+
+  const ITEMS = [
+    { label: 'Home', href: '/dashboard', icon: HomeIcon, center: false },
+    { label: t('sidebar', 'invoices'), href: '/invoices', icon: InvoiceIcon, center: false },
+    { label: 'Bill', href: '/invoices/new', icon: PlusIcon, center: true },
+    { label: t('sidebar', 'customers'), href: '/customers', icon: CustomersIcon, center: false },
+    { label: 'More', href: '/settings', icon: MoreIcon, center: false },
+  ]
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-2xl border-t border-black/5 dark:border-white/5 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_rgba(0,0,0,0.02)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.2)]">
@@ -28,9 +30,10 @@ export default function BottomNav() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative -mt-6 w-[56px] h-[56px] bg-gradient-to-br from-[#1B7A4A] to-[#25D366] rounded-full flex items-center justify-center shadow-lg shadow-[#1B7A4A]/30 hover:scale-105 active:scale-95 transition-transform"
+                aria-label="Naya bill banao"
+                className="tap relative -mt-6 w-[56px] h-[56px] bg-gradient-to-br from-[#1B7A4A] to-[#25D366] rounded-full flex items-center justify-center shadow-lg shadow-[#1B7A4A]/30 hover:scale-105 transition-transform"
               >
-                <Icon className="w-6 h-6 text-white" />
+                <Icon className="w-6 h-6 text-white" aria-hidden="true" />
               </Link>
             )
           }
@@ -42,7 +45,7 @@ export default function BottomNav() {
               className={`flex flex-col items-center gap-1 py-1 px-3 transition-colors ${
                 isActive
                   ? 'text-[#1B7A4A] dark:text-[#25D366]'
-                  : 'text-[#86868B] dark:text-[#98989D]'
+                  : 'text-[#6E6E73] dark:text-[#98989D]'
               }`}
             >
               <Icon className={`w-[22px] h-[22px] transition-transform ${isActive ? 'scale-110 stroke-[2.5px]' : ''}`} />

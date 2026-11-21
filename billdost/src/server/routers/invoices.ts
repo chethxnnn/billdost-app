@@ -2,7 +2,11 @@ import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 
-import { resolveShopAndRole } from '../utils/auth'
+import { requireManagerOrOwner, resolveShopAndRole } from '../utils/auth'
+import { ALLOWED_TAX_RATES, GSTIN_REGEX, computeTotals } from '@/lib/money'
+import { getCustomerTaxFacts, getShopTaxFacts } from '../utils/taxFacts'
+import { mapRpcError } from '../utils/rpcErrors'
+import { orIlikePattern } from '@/lib/search'
 
 /* ─── Helper ─── */
 async function getShop(supabase: any, userId: string) {
@@ -10,28 +14,25 @@ async function getShop(supabase: any, userId: string) {
   return shop
 }
 
-async function getNextInvoiceCounter(supabase: any, shopId: string, baseCounter: number) {
-  const { data } = await supabase
-    .from('invoices')
-    .select('invoice_number')
-    .eq('shop_id', shopId)
-    .order('created_at', { ascending: false })
-    .limit(1)
+/* ─── Schema for Creating Invoice ───
+   Inputs only (blueprint C3): the client sends facts, never money. Every
+   total, tax split, balance and payment status is recomputed server-side
+   by src/lib/money.ts, then written atomically by create_invoice_tx
+   (migration 0006), which re-validates the arithmetic, owns the invoice
+   number, deducts stock, writes the payments ledger row and lets the
+   customer-stats trigger maintain the customer aggregates. */
+const taxRateSchema = z
+  .number()
+  .refine((r) => (ALLOWED_TAX_RATES as readonly number[]).includes(r), {
+    message: 'Tax rate must be a valid GST slab',
+  })
 
-  let maxCounter = baseCounter
-  if (data && data.length > 0) {
-    const match = data[0].invoice_number.match(/\d+$/)
-    if (match) {
-      const num = parseInt(match[0], 10)
-      if (!isNaN(num) && num > maxCounter) {
-        maxCounter = num
-      }
-    }
-  }
-  return maxCounter + 1
-}
+const gstinSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.toUpperCase())
+  .refine((v) => GSTIN_REGEX.test(v), { message: 'Invalid GSTIN format' })
 
-/* ─── Schema for Creating Invoice ─── */
 const invoiceItemSchema = z.object({
   product_id: z.string().uuid().optional().nullable(),
   name: z.string().min(1, 'Item name required'),
@@ -39,38 +40,51 @@ const invoiceItemSchema = z.object({
   unit: z.string().default('piece'),
   quantity: z.number().min(0.01),
   unit_price: z.number().min(0),
-  making_charge: z.number().optional().nullable(),
-  tax_rate: z.number().default(0),
-  tax_amt: z.number().default(0),
-  total: z.number().min(0),
-})
-
-const createInvoiceSchema = z.object({
-  customer_id: z.string().uuid().optional().nullable(),
-  customer_name: z.string().min(1, 'Customer name required'),
-  customer_phone: z.string().optional().nullable(),
-  customer_address: z.string().optional().nullable(),
-  invoice_date: z.string(), // YYYY-MM-DD
-  due_date: z.string().optional().nullable(),
-  
-  subtotal: z.number().min(0),
+  making_charge: z.number().min(0).optional().nullable(),
+  tax_rate: taxRateSchema.default(0),
   discount_pct: z.number().min(0).max(100).default(0),
-  discount_amt: z.number().min(0).default(0),
-  taxable_amt: z.number().min(0),
-  cgst_amt: z.number().default(0),
-  sgst_amt: z.number().default(0),
-  igst_amt: z.number().default(0),
-  total: z.number().min(0),
-
-  amount_paid: z.number().min(0).default(0),
-  balance_due: z.number().min(0).default(0),
-  payment_status: z.enum(['unpaid', 'partial', 'paid']).default('unpaid'),
-  payment_mode: z.string().optional().nullable(),
-  include_upi_qr: z.boolean().default(true),
-  notes: z.string().optional().nullable(),
-  
-  items: z.array(invoiceItemSchema).min(1, 'At least 1 item required'),
 })
+
+const createInvoiceSchema = z
+  .object({
+    customer_id: z.string().uuid().optional().nullable(),
+    customer_name: z.string().min(1, 'Customer name required'),
+    customer_phone: z.string().optional().nullable(),
+    customer_address: z.string().optional().nullable(),
+    customer_gstin: gstinSchema.optional().nullable(),
+    customer_state: z.string().optional().nullable(),
+    customer_state_code: z
+      .string()
+      .regex(/^\d{2}$/, 'State code must be 2 digits')
+      .optional()
+      .nullable(),
+    invoice_date: z.string(), // YYYY-MM-DD
+    due_date: z.string().optional().nullable(),
+
+    discount_pct: z.number().min(0).max(100).default(0),
+
+    // The one cash fact the client may state: how much was collected at
+    // the counter. Status and balance are derived from it server-side.
+    amount_paid_at_creation: z.number().min(0).default(0),
+    payment_mode: z.string().optional().nullable(),
+    include_upi_qr: z.boolean().default(true),
+    notes: z.string().optional().nullable(),
+    // Origin tag (blueprint D4): the POS counter mode creates through
+    // this same path with source 'pos'. create_invoice_tx already
+    // reads payload.source and defaults to 'app'.
+    source: z.enum(['app', 'pos']).optional(),
+
+    items: z.array(invoiceItemSchema).min(1, 'At least 1 item required'),
+  })
+  .superRefine((val, ctx) => {
+    if (val.due_date && val.due_date < val.invoice_date) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['due_date'],
+        message: 'Due date cannot be before invoice date',
+      })
+    }
+  })
 
 export const invoicesRouter = router({
   /* ─────────────────────────────────────────
@@ -79,11 +93,11 @@ export const invoicesRouter = router({
   getShopSettings: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
     const shop = await getShop(supabase, user.id)
-    
+
     // For settings, we need to fetch additional fields since resolveShopAndRole returns a subset
     const { data: shopSettings, error } = await supabase
       .from('shops')
-      .select('name, address, phone, gstin, upi_id')
+      .select('name, address, phone, gstin, upi_id, state, logo_url, terms_conditions')
       .eq('id', shop.id)
       .single()
 
@@ -93,15 +107,16 @@ export const invoicesRouter = router({
 
   /* ─────────────────────────────────────────
      GET NEXT NUMBER
-     Returns the next logical invoice number (e.g. INV-1005)
+     Preview only: the counter is advanced atomically inside
+     create_invoice_tx, so this number is not reserved.
   ───────────────────────────────────────── */
   getNextNumber: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
     const shop = await getShop(supabase, user.id)
-    
+
     const prefix = shop.invoice_prefix || 'INV'
-    const nextCounter = await getNextInvoiceCounter(supabase, shop.id, shop.invoice_counter || 1000)
-    
+    const nextCounter = (shop.invoice_counter || 1000) + 1
+
     return {
       prefix,
       nextCounter,
@@ -111,168 +126,107 @@ export const invoicesRouter = router({
 
   /* ─────────────────────────────────────────
      CREATE
-     Creates invoice + line items in one go
+     Recompute with money.ts, then one create_invoice_tx call performs
+     every write (invoice, items, stock, ledger, activity) atomically.
   ───────────────────────────────────────── */
   create: protectedProcedure
     .input(createInvoiceSchema)
     .mutation(async ({ ctx, input }) => {
       const { supabase, user } = ctx
       const shop = await getShop(supabase, user.id)
+      const { items } = input
 
-      const prefix = shop.invoice_prefix || 'INV'
-      const counter = await getNextInvoiceCounter(supabase, shop.id, shop.invoice_counter || 1000)
-      const invoiceNumber = `${prefix}-${counter}`
-
-      let finalCustomerId = input.customer_id
-      const { items, ...invoiceData } = input
-
-      // 0. Auto-create or resolve customer
-      if (!finalCustomerId && invoiceData.customer_name) {
-        // Try to find by phone if provided
-        if (invoiceData.customer_phone) {
-          const { data: existingCust } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('shop_id', shop.id)
-            .eq('phone', invoiceData.customer_phone)
-            .single()
-            
-          if (existingCust) {
-            finalCustomerId = existingCust.id
-          }
-        }
-        
-        // If still no ID, create new customer
-        if (!finalCustomerId) {
-          const { data: newCust, error: newCustErr } = await supabase
-            .from('customers')
-            .insert({
-              shop_id: shop.id,
-              name: invoiceData.customer_name,
-              phone: invoiceData.customer_phone || null,
-              address: invoiceData.customer_address || null,
-              // Stats will be updated below in step 4
-            })
-            .select('id')
-            .single()
-            
-          if (!newCustErr && newCust) {
-            finalCustomerId = newCust.id
-          }
-        }
-      }
-
-      // 1. Insert Invoice
-      const { data: invoice, error: invoiceErr } = await supabase
-        .from('invoices')
-        .insert({
-          ...invoiceData,
-          customer_id: finalCustomerId,
-          shop_id: shop.id,
-          invoice_number: invoiceNumber,
-          paid_at: invoiceData.payment_status === 'paid' ? new Date().toISOString() : null,
-        })
-        .select('id')
-        .single()
-
-      if (invoiceErr || !invoice) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: invoiceErr?.message || 'Failed to create invoice' })
-      }
-
-      // 2. Insert Items
-      const itemsToInsert = items.map((item, idx) => ({
-        ...item,
-        invoice_id: invoice.id,
-        sort_order: idx,
-      }))
-
-      const { error: itemsErr } = await supabase
-        .from('invoice_items')
-        .insert(itemsToInsert)
-
-      if (itemsErr) {
-        // Very basic rollback since we don't have stored RPC for this transaction yet
-        await supabase.from('invoices').delete().eq('id', invoice.id)
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: itemsErr.message })
-      }
-
-      // 3. Deduct Stock & Write Ledger (for items with product_id)
-      for (const item of items) {
-        if (item.product_id) {
-          // fetch current stock
-          const { data: prod } = await supabase
-            .from('products')
-            .select('stock_qty')
-            .eq('id', item.product_id)
-            .single()
-
-          if (prod && prod.stock_qty !== null) {
-            const prevStock = prod.stock_qty
-            const newStock = prevStock - item.quantity
-
-            // update products
-            await supabase
-              .from('products')
-              .update({ stock_qty: newStock })
-              .eq('id', item.product_id)
-
-            // insert into inventory_logs
-            await supabase
-              .from('inventory_logs')
-              .insert({
-                shop_id: shop.id,
-                product_id: item.product_id,
-                type: 'SALE',
-                quantity_change: -item.quantity,
-                previous_stock: prevStock,
-                new_stock: newStock,
-                reference_id: invoice.id,
-                reference_number: invoiceNumber,
-                notes: `Sold via Bill ${invoiceNumber}`,
-                created_by: user.id
-              })
-          }
-        }
-      }
-
-      // 4. Update shop counter
-      await supabase
-        .from('shops')
-        .update({ invoice_counter: counter })
-        .eq('id', shop.id)
-
-      // 4. Update customer stats if customer_id exists
-      if (finalCustomerId) {
-        // Fetch current customer stats to increment
-        const { data: cust } = await supabase
-          .from('customers')
-          .select('total_billed, total_paid, bill_count')
-          .eq('id', finalCustomerId)
-          .single()
-        
-        if (cust) {
-          await supabase
-            .from('customers')
-            .update({
-              total_billed: Number(cust.total_billed || 0) + input.total,
-              total_paid: Number(cust.total_paid || 0) + input.amount_paid,
-              bill_count: Number(cust.bill_count || 0) + 1,
-              last_billed: new Date().toISOString(),
-            })
-            .eq('id', finalCustomerId)
-        }
-      }
-
-      // 5. Activity Log
-      await supabase.from('activity_log').insert({
-        shop_id: shop.id,
-        type: 'invoice_created',
-        entity_type: 'invoice',
-        entity_id: invoice.id,
-        summary: `Bill ${invoiceNumber} bana - ${input.customer_name} (₹${input.total})`,
+      // 1. Recompute every rupee server-side with the shared money engine.
+      const shopTax = await getShopTaxFacts(supabase, shop)
+      const customerTax = await getCustomerTaxFacts(supabase, shop.id, input.customer_id, input)
+      const totals = computeTotals({
+        items: items.map((item) => ({
+          name: item.name,
+          hsn_code: item.hsn_code,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          making_charge: item.making_charge,
+          tax_rate: item.tax_rate,
+          discount_pct: item.discount_pct,
+        })),
+        discount_pct: input.discount_pct,
+        shop_state_code: shopTax.stateCode,
+        customer_state_code: customerTax.stateCode,
+        customer_gstin: customerTax.gstin,
+        is_gst_registered: shopTax.isGstRegistered,
+        round_off: shopTax.roundOff,
       })
 
-      return { id: invoice.id, invoice_number: invoiceNumber }
+      const amountPaid = input.amount_paid_at_creation
+      if (amountPaid > totals.total) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Amount paid cannot be more than the bill total',
+        })
+      }
+
+      // 2. One atomic RPC writes everything. Customer ownership, product
+      // ownership and stock sufficiency are re-checked inside it
+      // (blueprint C5), so a forged payload writes nothing at all.
+      const payload = {
+        customer_id: input.customer_id || null,
+        customer_name: input.customer_name,
+        customer_phone: input.customer_phone || null,
+        customer_address: input.customer_address || null,
+        customer_gstin: customerTax.gstin,
+        customer_state_code: customerTax.stateCode,
+        invoice_date: input.invoice_date,
+        due_date: input.due_date || null,
+        discount_pct: input.discount_pct,
+        amount_paid: amountPaid,
+        payment_mode: input.payment_mode || null,
+        include_upi_qr: input.include_upi_qr,
+        notes: input.notes || null,
+        source: input.source || 'app',
+        is_interstate: totals.is_interstate,
+        place_of_supply_state_code: totals.place_of_supply_state_code,
+        totals: {
+          subtotal: totals.subtotal,
+          discount_amt: totals.discount_amt,
+          taxable_amt: totals.taxable_amt,
+          cgst_amt: totals.cgst_amt,
+          sgst_amt: totals.sgst_amt,
+          igst_amt: totals.igst_amt,
+          round_off_amt: totals.round_off_amt,
+          total: totals.total,
+        },
+        items: items.map((item, idx) => ({
+          product_id: item.product_id || null,
+          name: item.name,
+          hsn_code: item.hsn_code || null,
+          unit: item.unit,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          making_charge: item.making_charge || 0,
+          tax_rate: item.tax_rate,
+          discount_amt: totals.lines[idx].discount_amt,
+          taxable_amt: totals.lines[idx].taxable_amt,
+          tax_amt: totals.lines[idx].tax_amt,
+          total: totals.lines[idx].total,
+          sort_order: idx,
+        })),
+      }
+
+      const { data: invoiceId, error: rpcError } = await supabase.rpc('create_invoice_tx', {
+        p_shop_id: shop.id,
+        p_actor: user.id,
+        p_payload: payload,
+      })
+
+      if (rpcError || !invoiceId) throw mapRpcError(rpcError)
+
+      const { data: created } = await supabase
+        .from('invoices')
+        .select('invoice_number')
+        .eq('id', invoiceId)
+        .single()
+
+      return { id: invoiceId as string, invoice_number: created?.invoice_number as string }
     }),
 
   /* ─────────────────────────────────────────
@@ -292,10 +246,10 @@ export const invoicesRouter = router({
         .order('created_at', { ascending: false })
 
       if (input?.search && input.search.trim()) {
-        const s = `%${input.search.trim()}%`
+        const s = orIlikePattern(input.search)
         query = query.or(`customer_name.ilike.${s},invoice_number.ilike.${s}`)
       }
-      
+
       if (input?.status && input.status !== 'all') {
         query = query.eq('payment_status', input.status)
       }
@@ -333,7 +287,7 @@ export const invoicesRouter = router({
       // Get shop details for the PDF
       const { data: shopDetails } = await supabase
         .from('shops')
-        .select('id, name, address, phone, gstin, upi_id')
+        .select('id, name, address, phone, gstin, upi_id, logo_url, terms_conditions')
         .eq('id', shop.id)
         .single()
 
@@ -346,10 +300,12 @@ export const invoicesRouter = router({
 
   /* ─────────────────────────────────────────
      RECORD PAYMENT
-     Marks an invoice as paid and updates customer stats
+     Delegates to record_payment_tx: the invoice row is locked, the
+     amount is capped at balance_due inside the database, the payments
+     ledger row and the customer stats move in the same transaction.
   ───────────────────────────────────────── */
   recordPayment: protectedProcedure
-    .input(z.object({ 
+    .input(z.object({
       id: z.string().uuid(),
       payment_mode: z.string(),
       amount_paid: z.number().min(0.01)
@@ -358,160 +314,90 @@ export const invoicesRouter = router({
       const { supabase, user } = ctx
       const shop = await getShop(supabase, user.id)
 
-      // Fetch invoice first to verify and get current balance
-      const { data: invoice, error: fetchErr } = await supabase
+      // Shop-scope check first so a foreign invoice id reads as missing.
+      const { data: invoice } = await supabase
         .from('invoices')
-        .select('id, total, amount_paid, balance_due, payment_status, customer_id, invoice_number')
+        .select('id')
         .eq('id', input.id)
         .eq('shop_id', shop.id)
         .single()
 
-      if (fetchErr || !invoice) throw new TRPCError({ code: 'NOT_FOUND', message: 'Invoice not found' })
-      if (invoice.payment_status === 'paid' || invoice.balance_due <= 0) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invoice is already fully paid' })
-      }
+      if (!invoice) throw new TRPCError({ code: 'NOT_FOUND', message: 'Invoice not found' })
 
-      // Calculate new balances
-      const newAmountPaid = Number(invoice.amount_paid) + input.amount_paid
-      const newBalanceDue = Math.max(0, Number(invoice.total) - newAmountPaid)
-      const newStatus = newBalanceDue <= 0 ? 'paid' : 'partial'
-
-      // Update invoice
-      const { error: updateErr } = await supabase
-        .from('invoices')
-        .update({
-          amount_paid: newAmountPaid,
-          balance_due: newBalanceDue,
-          payment_status: newStatus,
-          payment_mode: input.payment_mode,
-          paid_at: newStatus === 'paid' ? new Date().toISOString() : null
-        })
-        .eq('id', invoice.id)
-
-      if (updateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateErr.message })
-
-      // Update customer stats if customer exists
-      if (invoice.customer_id) {
-        const { data: cust } = await supabase
-          .from('customers')
-          .select('total_paid')
-          .eq('id', invoice.customer_id)
-          .single()
-          
-        if (cust) {
-          await supabase
-            .from('customers')
-            .update({ total_paid: Number(cust.total_paid || 0) + input.amount_paid })
-            .eq('id', invoice.customer_id)
-        }
-      }
-
-      // Log Payment
-      await supabase.from('payments').insert({
-        shop_id: shop.id,
-        invoice_id: invoice.id,
-        amount: input.amount_paid,
-        mode: input.payment_mode,
+      const { data: result, error } = await supabase.rpc('record_payment_tx', {
+        p_invoice_id: input.id,
+        p_amount: input.amount_paid,
+        p_mode: input.payment_mode,
+        p_actor: user.id,
       })
 
-      // Activity Log
-      await supabase.from('activity_log').insert({
-        shop_id: shop.id,
-        type: 'payment_received',
-        entity_type: 'invoice',
-        entity_id: invoice.id,
-        summary: `Payment received: ₹${input.amount_paid} for Bill ${invoice.invoice_number}`,
-      })
+      if (error) throw mapRpcError(error)
 
-      return { success: true, newStatus, newBalanceDue }
+      const updated = result as { amount_paid: number; balance_due: number; payment_status: string }
+      return {
+        success: true,
+        newStatus: updated.payment_status,
+        newBalanceDue: updated.balance_due,
+      }
     }),
 
   /* ─────────────────────────────────────────
      BULK MARK PAID
+     Manager and owner only (blueprint C4). One bulk_mark_paid_tx call
+     settles every selected bill; already-paid bills are skipped inside
+     the RPC and the returned count is the number actually marked.
   ───────────────────────────────────────── */
   bulkMarkPaid: protectedProcedure
     .input(z.object({
-      ids: z.array(z.string().uuid()),
+      ids: z.array(z.string().uuid()).min(1).max(200),
       payment_mode: z.string().default('cash')
     }))
     .mutation(async ({ ctx, input }) => {
       const { supabase, user } = ctx
-      const shop = await getShop(supabase, user.id)
+      await requireManagerOrOwner(supabase, user.id)
 
-      if (input.ids.length === 0) return { success: true, count: 0 }
-
-      // Fetch unpaid invoices
-      const { data: invoices, error: fetchErr } = await supabase
-        .from('invoices')
-        .select('id, balance_due, customer_id, invoice_number')
-        .in('id', input.ids)
-        .eq('shop_id', shop.id)
-        .gt('balance_due', 0)
-
-      if (fetchErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: fetchErr.message })
-      if (!invoices || invoices.length === 0) return { success: true, count: 0 }
-
-      let totalCollected = 0
-      const customerUpdates: Record<string, number> = {}
-
-      for (const inv of invoices) {
-        totalCollected += Number(inv.balance_due)
-        
-        // Update Invoice
-        await supabase
-          .from('invoices')
-          .update({
-            amount_paid: supabase.rpc('increment_amount_paid', { val: Number(inv.balance_due) }), // Simplification
-            balance_due: 0,
-            payment_status: 'paid',
-            payment_mode: input.payment_mode,
-            paid_at: new Date().toISOString()
-          })
-          .eq('id', inv.id)
-
-        // Calculate customer updates
-        if (inv.customer_id) {
-          customerUpdates[inv.customer_id] = (customerUpdates[inv.customer_id] || 0) + Number(inv.balance_due)
-        }
-
-        // Log payment
-        await supabase.from('payments').insert({
-          shop_id: shop.id,
-          invoice_id: inv.id,
-          amount: Number(inv.balance_due),
-          mode: input.payment_mode,
-        })
-      }
-
-      // We need to do a custom direct query for the amount_paid increment since Supabase RPC might not exist.
-      // A better way: Just update amount_paid = total since we know balance_due is fully paid
-      for (const inv of invoices) {
-        await supabase
-          .from('invoices')
-          .update({
-             balance_due: 0,
-             payment_status: 'paid',
-             payment_mode: input.payment_mode,
-             paid_at: new Date().toISOString()
-          })
-          .eq('id', inv.id)
-        
-        // Fix amount_paid explicitly by getting total
-        const { data: invFull } = await supabase.from('invoices').select('total').eq('id', inv.id).single()
-        if (invFull) {
-           await supabase.from('invoices').update({ amount_paid: invFull.total }).eq('id', inv.id)
-        }
-      }
-
-      // Log activity
-      await supabase.from('activity_log').insert({
-        shop_id: shop.id,
-        type: 'payment_received',
-        entity_type: 'invoice',
-        entity_id: invoices[0].id,
-        summary: `Bulk marked ${invoices.length} bill(s) as paid (Total ₹${totalCollected})`,
+      const { data: marked, error } = await supabase.rpc('bulk_mark_paid_tx', {
+        p_invoice_ids: input.ids,
+        p_actor: user.id,
       })
 
-      return { success: true, count: invoices.length }
+      if (error) throw mapRpcError(error)
+
+      return { success: true, count: marked as number }
+    }),
+
+  /* ─────────────────────────────────────────
+     CANCEL
+     Manager and owner only. cancel_invoice_tx reverses stock and lets
+     the stats trigger subtract the bill. A bill with receipts raises
+     has_payments until a refund is recorded (blueprint B.6, C10).
+  ───────────────────────────────────────── */
+  cancel: protectedProcedure
+    .input(z.object({
+      id: z.string().uuid(),
+      reason: z.string().max(300).optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { supabase, user } = ctx
+      const shop = await requireManagerOrOwner(supabase, user.id)
+
+      const { data: invoice } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('id', input.id)
+        .eq('shop_id', shop.id)
+        .single()
+
+      if (!invoice) throw new TRPCError({ code: 'NOT_FOUND', message: 'Invoice not found' })
+
+      const { error } = await supabase.rpc('cancel_invoice_tx', {
+        p_invoice_id: input.id,
+        p_reason: input.reason || null,
+        p_actor: user.id,
+      })
+
+      if (error) throw mapRpcError(error)
+
+      return { success: true }
     }),
 })

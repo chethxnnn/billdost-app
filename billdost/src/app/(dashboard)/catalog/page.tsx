@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import MagicExtractModal from '@/components/dashboard/MagicExtractModal'
+import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
+import { ScanLine } from 'lucide-react'
+import { toast } from 'sonner'
 
 /* ─── Types ─── */
 type Unit = 'piece' | 'kg' | 'g' | 'litre' | 'ml' | 'dozen' | 'pack' | 'service' | 'hour'
@@ -20,6 +23,8 @@ interface Product {
   tax_rate: number
   stock_qty?: number | null
   low_stock_alert?: number | null
+  barcode?: string | null
+  track_expiry?: boolean
   is_active: boolean
   sort_order: number
 }
@@ -44,7 +49,7 @@ const formatINR = (n: number) =>
 
 const avatarColor = (name: string) => {
   const colors = [
-    ['#0D2E1F', '#2BB673'], ['#1a1a2e', '#4361ee'], ['#2d1b00', '#f48c06'],
+    ['#0D2E1F', '#25D366'], ['#1a1a2e', '#4361ee'], ['#2d1b00', '#f48c06'],
     ['#1a0a0a', '#e63946'], ['#0a1a2d', '#4cc9f0'], ['#1a0d2e', '#7b2d8b'],
   ]
   return colors[name.charCodeAt(0) % colors.length]
@@ -52,7 +57,7 @@ const avatarColor = (name: string) => {
 
 /* ─── Skeleton ─── */
 function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-xl bg-gray-100 dark:bg-[#2E2C28] ${className}`} />
+  return <div className={`animate-pulse rounded-xl bg-gray-100 dark:bg-[#38383A] ${className}`} />
 }
 
 /* ─── Low stock badge ─── */
@@ -85,7 +90,7 @@ function ProductCard({
     Number(product.stock_qty) <= Number(product.low_stock_alert)
 
   return (
-    <div className="group bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl p-4 hover:shadow-md dark:hover:border-[#3E3C38] transition-all duration-200 flex flex-col gap-3">
+    <div className="group bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-4 hover:shadow-md dark:hover:border-[#48484A] transition-all duration-200 flex flex-col gap-3">
       {/* Top row */}
       <div className="flex items-start gap-3">
         {/* Avatar */}
@@ -102,24 +107,28 @@ function ProductCard({
             {product.name}
           </div>
           {product.category && (
-            <div className="text-xs text-gray-400 dark:text-[#5C5A56] capitalize mt-0.5">
+            <div className="text-xs text-gray-400 dark:text-[#98989D] capitalize mt-0.5">
               {product.category}
             </div>
           )}
         </div>
 
-        {/* Actions — show on hover */}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Actions: always visible on touch at 44px (were hover-only at
+            28px, unreachable and untappable on a phone), hover-reveal
+            on larger screens. */}
+        <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onEdit(product)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#1B7A4A] dark:hover:text-[#2BB673] hover:bg-gray-50 dark:hover:bg-[#1E1C1A] transition-colors"
+            aria-label={`${product.name} edit karo`}
+            className="tap w-11 h-11 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#1B7A4A] dark:hover:text-[#25D366] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
             title="Edit"
           >
             <PencilIcon />
           </button>
           <button
             onClick={() => onDelete(product.id)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-[#2E1A10] transition-colors"
+            aria-label={`${product.name} delete karo`}
+            className="tap w-11 h-11 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-[#2E1A10] transition-colors"
             title="Delete"
           >
             <TrashIcon />
@@ -130,10 +139,10 @@ function ProductCard({
       {/* Price row */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-lg font-extrabold text-[#1B7A4A] dark:text-[#2BB673]">
+          <div className="text-lg font-extrabold text-[#1B7A4A] dark:text-[#25D366]">
             {formatINR(Number(product.price))}
           </div>
-          <div className="text-xs text-gray-400 dark:text-[#5C5A56]">
+          <div className="text-xs text-gray-400 dark:text-[#98989D]">
             {t('catalog', 'per')} {product.unit}
             {product.tax_rate > 0 && ` · ${t('catalog', 'gst')} ${product.tax_rate}%`}
           </div>
@@ -145,7 +154,7 @@ function ProductCard({
             {isLowStock ? (
               <LowStockBadge t={t} />
             ) : (
-              <span className="text-xs text-gray-500 dark:text-[#9A9690]">
+              <span className="text-xs text-gray-500 dark:text-[#98989D]">
                 {t('catalog', 'stock')}: {product.stock_qty} {product.unit}
               </span>
             )}
@@ -168,6 +177,8 @@ const DEFAULT_FORM = {
   tax_rate: 0,
   stock_qty: undefined as number | undefined,
   low_stock_alert: undefined as number | undefined,
+  barcode: '',
+  track_expiry: false,
   is_active: true,
 }
 
@@ -175,19 +186,24 @@ const DEFAULT_FORM = {
 function ProductDrawer({
   open,
   product,
+  prefillBarcode,
   onClose,
   onSaved,
   t,
 }: {
   open: boolean
   product: Product | null
+  prefillBarcode?: string | null
   onClose: () => void
   onSaved: () => void
   t: any
 }) {
   const [form, setForm] = useState({ ...DEFAULT_FORM })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [barcodeWarning, setBarcodeWarning] = useState('')
+  const [drawerScannerOpen, setDrawerScannerOpen] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
+  const utils = trpc.useUtils()
 
   const createMut = trpc.products.create.useMutation({ onSuccess: () => { onSaved(); onClose() } })
   const updateMut = trpc.products.update.useMutation({ onSuccess: () => { onSaved(); onClose() } })
@@ -205,13 +221,37 @@ function ProductDrawer({
         tax_rate: Number(product.tax_rate),
         stock_qty: product.stock_qty !== null && product.stock_qty !== undefined ? Number(product.stock_qty) : undefined,
         low_stock_alert: product.low_stock_alert !== null && product.low_stock_alert !== undefined ? Number(product.low_stock_alert) : undefined,
+        barcode: product.barcode ?? '',
+        track_expiry: product.track_expiry ?? false,
         is_active: product.is_active,
       })
     } else {
-      setForm({ ...DEFAULT_FORM })
+      setForm({ ...DEFAULT_FORM, barcode: prefillBarcode ?? '' })
     }
     setErrors({})
-  }, [product, open])
+    setBarcodeWarning('')
+  }, [product, open, prefillBarcode])
+
+  // Duplicate barcode warning (blueprint D2): checked live against the
+  // catalog; the server repeats the check and the unique index is the
+  // final backstop.
+  const checkBarcode = async (code: string) => {
+    const trimmed = code.trim()
+    if (!trimmed) {
+      setBarcodeWarning('')
+      return
+    }
+    try {
+      const found = await utils.products.getByBarcode.fetch({ barcode: trimmed })
+      if (found && found.id !== product?.id) {
+        setBarcodeWarning(`Ye barcode pehle se "${found.name}" par laga hai.`)
+      } else {
+        setBarcodeWarning('')
+      }
+    } catch {
+      setBarcodeWarning('')
+    }
+  }
 
   // Close on backdrop click
   useEffect(() => {
@@ -226,6 +266,7 @@ function ProductDrawer({
     const e: Record<string, string> = {}
     if (!form.name.trim()) e.name = 'Name zaroori hai'
     if (form.price < 0) e.price = 'Price 0 ya zyada hona chahiye'
+    if (barcodeWarning) e.barcode = barcodeWarning
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -244,6 +285,8 @@ function ProductDrawer({
       tax_rate: form.tax_rate,
       stock_qty: form.stock_qty ?? null,
       low_stock_alert: form.low_stock_alert ?? null,
+      barcode: form.barcode.trim() || null,
+      track_expiry: form.track_expiry,
       is_active: form.is_active,
     }
     if (product) {
@@ -267,21 +310,21 @@ function ProductDrawer({
       {/* Drawer */}
       <div
         ref={drawerRef}
-        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-[#161513] border-l border-gray-100 dark:border-[#2E2C28] z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-[#1C1C1E] border-l border-gray-100 dark:border-[#38383A] z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Drawer header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-[#2E2C28] flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-[#38383A] flex-shrink-0">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               {product ? t('catalog', 'edit_product') : t('catalog', 'add_product')}
             </h2>
-            <p className="text-xs text-gray-400 dark:text-[#5C5A56] mt-0.5">
+            <p className="text-xs text-gray-400 dark:text-[#98989D] mt-0.5">
               {product ? t('catalog', 'update_details') : t('catalog', 'add_to_catalog')}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#252320] transition-colors"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
           >
             <XIcon />
           </button>
@@ -291,35 +334,35 @@ function ProductDrawer({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
               {t('catalog', 'name')} *
             </label>
             <input
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
               placeholder="e.g. Basmati Rice"
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
             />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
               {t('catalog', 'category')}
             </label>
             <input
               value={form.category}
               onChange={(e) => set('category', e.target.value)}
               placeholder="e.g. Grains, Dairy, Snacks"
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
             />
           </div>
 
           {/* Price + Unit */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
                 {t('catalog', 'selling_price')} *
               </label>
               <input
@@ -329,18 +372,18 @@ function ProductDrawer({
                 value={form.price || ''}
                 onChange={(e) => set('price', parseFloat(e.target.value) || 0)}
                 placeholder="0.00"
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
               />
               {errors.price && <p className="text-xs text-red-500 mt-1">{errors.price}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
                 {t('catalog', 'unit')}
               </label>
               <select
                 value={form.unit}
                 onChange={(e) => set('unit', e.target.value as Unit)}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
               >
                 {UNITS.map((u) => (
                   <option key={u.value} value={u.value}>{u.label}</option>
@@ -352,7 +395,7 @@ function ProductDrawer({
           {/* Cost Price + GST */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
                 {t('catalog', 'cost_price')}
               </label>
               <input
@@ -362,17 +405,17 @@ function ProductDrawer({
                 value={form.cost_price ?? ''}
                 onChange={(e) => set('cost_price', e.target.value ? parseFloat(e.target.value) : undefined)}
                 placeholder="0.00"
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
                 {t('catalog', 'gst_rate')}
               </label>
               <select
                 value={form.tax_rate}
                 onChange={(e) => set('tax_rate', Number(e.target.value))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
               >
                 {GST_RATES.map((r) => (
                   <option key={r} value={r}>{r}%</option>
@@ -384,7 +427,7 @@ function ProductDrawer({
           {/* Stock + Low stock alert */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
                 {t('catalog', 'stock_qty')}
               </label>
               <input
@@ -393,11 +436,11 @@ function ProductDrawer({
                 value={form.stock_qty ?? ''}
                 onChange={(e) => set('stock_qty', e.target.value ? parseFloat(e.target.value) : undefined)}
                 placeholder={t('catalog', 'skip_blank')}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
                 {t('catalog', 'low_stock_alert')}
               </label>
               <input
@@ -406,27 +449,70 @@ function ProductDrawer({
                 value={form.low_stock_alert ?? ''}
                 onChange={(e) => set('low_stock_alert', e.target.value ? parseFloat(e.target.value) : undefined)}
                 placeholder={t('catalog', 'alert_below')}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
               />
             </div>
           </div>
 
           {/* HSN Code */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
               {t('catalog', 'hsn_code')} <span className="font-normal normal-case">{t('catalog', 'optional')}</span>
             </label>
             <input
               value={form.hsn_code}
               onChange={(e) => set('hsn_code', e.target.value)}
               placeholder="e.g. 1006"
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
             />
           </div>
 
+          {/* Barcode (D2) + expiry tracking (D5) */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
+              Barcode <span className="font-normal normal-case">{t('catalog', 'optional')}</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={form.barcode}
+                onChange={(e) => { set('barcode', e.target.value); setBarcodeWarning('') }}
+                onBlur={(e) => void checkBarcode(e.target.value)}
+                placeholder="e.g. 8901234567890"
+                className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setDrawerScannerOpen(true)}
+                className="tap inline-flex items-center gap-1.5 px-4 rounded-xl bg-[#1B7A4A]/10 dark:bg-[#25D366]/10 text-[#1B7A4A] dark:text-[#25D366] text-sm font-bold"
+              >
+                <ScanLine className="w-4 h-4" aria-hidden="true" /> Scan
+              </button>
+            </div>
+            {barcodeWarning && <p className="text-xs text-red-500 mt-1.5">{barcodeWarning}</p>}
+            {drawerScannerOpen && (
+              <BarcodeScanner
+                onDetected={(code) => { setDrawerScannerOpen(false); set('barcode', code); void checkBarcode(code) }}
+                onClose={() => setDrawerScannerOpen(false)}
+              />
+            )}
+          </div>
+
+          <label className="flex items-center justify-between gap-3 px-4 py-3 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl cursor-pointer">
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
+              Expiry tracking (batch wala item)
+              <span className="block text-xs font-normal text-gray-500 dark:text-[#98989D]">Medical / FMCG items ke liye batch aur expiry Inventory mein manage hoga</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.track_expiry}
+              onChange={(e) => set('track_expiry', e.target.checked)}
+              className="w-5 h-5 accent-[#1B7A4A]"
+            />
+          </label>
+
           {/* Description */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9A9690] uppercase tracking-wide mb-1.5">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#98989D] uppercase tracking-wide mb-1.5">
               {t('catalog', 'description')} <span className="font-normal normal-case">{t('catalog', 'optional')}</span>
             </label>
             <textarea
@@ -434,7 +520,7 @@ function ProductDrawer({
               onChange={(e) => set('description', e.target.value)}
               rows={2}
               placeholder={t('catalog', 'short_desc')}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors resize-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors resize-none"
             />
           </div>
 
@@ -446,11 +532,11 @@ function ProductDrawer({
         </form>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-[#2E2C28] flex gap-3 flex-shrink-0">
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-[#38383A] flex gap-3 flex-shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#2E2C28] text-sm font-medium text-gray-600 dark:text-[#9A9690] hover:bg-gray-50 dark:hover:bg-[#1E1C1A] transition-colors"
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#38383A] text-sm font-medium text-gray-600 dark:text-[#98989D] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
           >
             {t('common', 'cancel')}
           </button>
@@ -492,18 +578,18 @@ function DeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+      <div className="relative bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
         <div className="text-3xl mb-3">🗑️</div>
         <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">
           {t('catalog', 'delete_confirm_title')}
         </h3>
-        <p className="text-sm text-gray-500 dark:text-[#9A9690] mb-5">
+        <p className="text-sm text-gray-500 dark:text-[#98989D] mb-5">
           <strong className="text-gray-900 dark:text-white">"{productName}"</strong> {t('catalog', 'delete_confirm_msg')}
         </p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#2E2C28] text-sm font-medium text-gray-600 dark:text-[#9A9690] hover:bg-gray-50 dark:hover:bg-[#1E1C1A] transition-colors"
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#38383A] text-sm font-medium text-gray-600 dark:text-[#98989D] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
           >
             {t('common', 'cancel')}
           </button>
@@ -531,8 +617,29 @@ export default function CatalogPage() {
   const [deleteId, setDeleteId]         = useState<string | null>(null)
   const [deleteName, setDeleteName]     = useState('')
   const [magicOpen, setMagicOpen]       = useState(false)
+  const [scanOpen, setScanOpen]         = useState(false)
+  const [prefillBarcode, setPrefillBarcode] = useState<string | null>(null)
 
   const utils = trpc.useUtils()
+
+  // Barcode lookup (blueprint D2): a known code opens that product for
+  // editing; an unknown code opens the add drawer with the code filled.
+  const handleScanLookup = async (code: string) => {
+    setScanOpen(false)
+    try {
+      const found = await utils.products.getByBarcode.fetch({ barcode: code })
+      if (found) {
+        handleEdit(found as unknown as Product)
+      } else {
+        toast.info(`Barcode ${code} naya hai. Is code ke saath product banao.`, { duration: 4000 })
+        setPrefillBarcode(code)
+        setEditProduct(null)
+        setDrawerOpen(true)
+      }
+    } catch {
+      toast.error('Barcode lookup nahi ho paya. Dobara try karo.')
+    }
+  }
 
   const { data: products, isLoading } = trpc.products.list.useQuery({
     search: search || undefined,
@@ -570,7 +677,7 @@ export default function CatalogPage() {
           <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             {t('catalog', 'title')} 📦
           </h1>
-          <p className="text-sm text-gray-400 dark:text-[#5C5A56] mt-0.5">
+          <p className="text-sm text-gray-400 dark:text-[#98989D] mt-0.5">
             {isLoading ? '...' : `${products?.length ?? 0} ${t('catalog', 'total_products')}`}
             {lowStockCount > 0 && (
               <span className="ml-2 text-red-500 dark:text-[#E8622A] font-medium">
@@ -581,6 +688,13 @@ export default function CatalogPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setScanOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] text-gray-900 dark:text-white text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-all active:scale-[0.98] shadow-sm"
+          >
+            <ScanLine className="w-4 h-4" aria-hidden="true" />
+            Barcode Scan
+          </button>
+          <button
             onClick={() => setMagicOpen(true)}
             className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#1B7A4A] to-[#25D366] hover:from-[#155F3A] hover:to-[#1B7A4A] text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-[#25D366]/20 hover:scale-[1.02] active:scale-[0.98]"
           >
@@ -588,7 +702,7 @@ export default function CatalogPage() {
           </button>
           <button
             onClick={handleAdd}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#2E2C28] text-gray-900 dark:text-white text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-all active:scale-[0.98] shadow-sm"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] text-gray-900 dark:text-white text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-all active:scale-[0.98] shadow-sm"
           >
             <span className="text-base">+</span>
             {t('catalog', 'add_product')}
@@ -600,12 +714,12 @@ export default function CatalogPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         {/* Search */}
         <div className="relative flex-1">
-          <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C5A56] w-4 h-4 pointer-events-none" />
+          <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#98989D] w-4 h-4 pointer-events-none" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('catalog', 'search_placeholder')}
-            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
           />
         </div>
 
@@ -619,7 +733,7 @@ export default function CatalogPage() {
                 className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   activeCategory === cat
                     ? 'bg-[#1B7A4A] text-white shadow-sm'
-                    : 'bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] text-gray-600 dark:text-[#9A9690] hover:border-gray-300 dark:hover:border-[#3E3C38]'
+                    : 'bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#98989D] hover:border-gray-300 dark:hover:border-[#48484A]'
                 }`}
               >
                 {cat === 'all' ? t('catalog', 'all') : cat}
@@ -633,7 +747,7 @@ export default function CatalogPage() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl p-4 space-y-3">
+            <div key={i} className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-4 space-y-3">
               <div className="flex gap-3">
                 <Skeleton className="w-11 h-11 rounded-xl flex-shrink-0" />
                 <div className="flex-1 space-y-2">
@@ -653,7 +767,7 @@ export default function CatalogPage() {
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
             {search || activeCategory !== 'all' ? t('catalog', 'no_products_found') : t('catalog', 'catalog_empty')}
           </h3>
-          <p className="text-sm text-gray-400 dark:text-[#5C5A56] mb-6 max-w-xs">
+          <p className="text-sm text-gray-400 dark:text-[#98989D] mb-6 max-w-xs">
             {search || activeCategory !== 'all'
               ? t('catalog', 'remove_filter')
               : t('catalog', 'add_first')}
@@ -681,12 +795,17 @@ export default function CatalogPage() {
         </div>
       )}
 
+      {scanOpen && (
+        <BarcodeScanner onDetected={(code) => void handleScanLookup(code)} onClose={() => setScanOpen(false)} />
+      )}
+
       {/* Add/Edit Drawer */}
       <ProductDrawer
         open={drawerOpen}
         product={editProduct}
-        onClose={handleCloseDrawer}
-        onSaved={handleSaved}
+        prefillBarcode={prefillBarcode}
+        onClose={() => { handleCloseDrawer(); setPrefillBarcode(null) }}
+        onSaved={() => { handleSaved(); setPrefillBarcode(null) }}
         t={t}
       />
 

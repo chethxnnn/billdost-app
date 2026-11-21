@@ -1,3 +1,5 @@
+// DEPRECATED (Stage 2): replaced by the official WhatsApp Cloud API in
+// billdost/src/server/whatsapp.ts. Do not deploy. See README.md here.
 const express = require('express');
 const cors = require('cors');
 const qrcode = require('qrcode');

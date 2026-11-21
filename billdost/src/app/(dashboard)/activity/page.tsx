@@ -42,15 +42,15 @@ export default function ActivityPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-3xl p-6 ios-shadow">
+      <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-3xl p-6 ios-shadow">
         {isLoading ? (
           <div className="space-y-6">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="flex gap-4 animate-pulse">
-                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-[#2E2C28] flex-shrink-0" />
+                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-[#38383A] flex-shrink-0" />
                 <div className="flex-1 space-y-2 py-1">
-                  <div className="h-4 bg-gray-200 dark:bg-[#2E2C28] rounded w-3/4" />
-                  <div className="h-3 bg-gray-200 dark:bg-[#2E2C28] rounded w-1/4" />
+                  <div className="h-4 bg-gray-200 dark:bg-[#38383A] rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 dark:bg-[#38383A] rounded w-1/4" />
                 </div>
               </div>
             ))}
@@ -62,7 +62,7 @@ export default function ActivityPage() {
         ) : (
           <div className="relative">
             {/* Vertical Line */}
-            <div className="absolute top-6 bottom-6 left-[20px] w-0.5 bg-gray-100 dark:bg-[#2E2C28]" />
+            <div className="absolute top-6 bottom-6 left-[20px] w-0.5 bg-gray-100 dark:bg-[#38383A]" />
             
             <div className="space-y-8 relative">
               {activity.map((act) => {
@@ -70,10 +70,10 @@ export default function ActivityPage() {
                 
                 return (
                   <div key={act.id} className="flex gap-5 relative group">
-                    <div className="relative z-10 w-10 h-10 rounded-full bg-white dark:bg-[#1C1C1E] flex items-center justify-center text-[#1B7A4A] dark:text-[#25D366] shadow-sm border border-gray-100 dark:border-[#2E2C28] group-hover:scale-110 transition-transform">
+                    <div className="relative z-10 w-10 h-10 rounded-full bg-white dark:bg-[#1C1C1E] flex items-center justify-center text-[#1B7A4A] dark:text-[#25D366] shadow-sm border border-gray-100 dark:border-[#38383A] group-hover:scale-110 transition-transform">
                       {icon}
                     </div>
-                    <div className="flex-1 bg-gray-50 dark:bg-[#1E1C1A] border border-gray-100 dark:border-[#2E2C28] rounded-2xl p-4 group-hover:border-[#1B7A4A] dark:group-hover:border-[#25D366] transition-colors">
+                    <div className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-4 group-hover:border-[#1B7A4A] dark:group-hover:border-[#25D366] transition-colors">
                       <p className="text-[15px] font-semibold text-gray-900 dark:text-[#F5F5F7]">
                         {act.summary}
                       </p>

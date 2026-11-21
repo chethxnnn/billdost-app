@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import { useTranslation } from '@/lib/i18n/useTranslation'
+import { useShop } from '@/components/shared/ShopContext'
+import { PaymentStatusBadge } from '@/components/invoices/PaymentStatusBadge'
 
 /* ─── Helpers ─── */
 const formatINR = (n: number) =>
@@ -26,11 +28,11 @@ function InvoiceCard({ invoice, isSelected, onToggle, t }: { invoice: any, isSel
   
   return (
     <div 
-      className={`relative bg-white dark:bg-[#161513] border rounded-2xl p-4 transition-all duration-200 ${
-        isPaid ? 'border-gray-100 dark:border-[#2E2C28] opacity-75' :
+      className={`relative bg-white dark:bg-[#1C1C1E] border rounded-2xl p-4 transition-all duration-200 ${
+        isPaid ? 'border-gray-100 dark:border-[#38383A] opacity-75' :
         isSelected 
           ? 'border-[#1B7A4A] dark:border-[#25D366] shadow-sm bg-[#1B7A4A]/5 dark:bg-[#25D366]/5 cursor-pointer' 
-          : 'border-gray-100 dark:border-[#2E2C28] hover:shadow-md dark:hover:border-[#3E3C38] cursor-pointer'
+          : 'border-gray-100 dark:border-[#38383A] hover:shadow-md dark:hover:border-[#48484A] cursor-pointer'
       }`}
       onClick={(e) => {
         if (isPaid) return
@@ -52,13 +54,13 @@ function InvoiceCard({ invoice, isSelected, onToggle, t }: { invoice: any, isSel
 
       <div className={`flex justify-between items-start mb-3 ${!isPaid ? 'pr-8' : ''}`}>
         <div>
-          <div className="text-xs font-bold text-gray-500 dark:text-[#9A9690] uppercase tracking-widest mb-1">
+          <div className="text-xs font-bold text-gray-500 dark:text-[#98989D] uppercase tracking-widest mb-1">
             {invoice.invoice_number}
           </div>
           <div className="font-bold text-gray-900 dark:text-white truncate max-w-[180px]">
             {invoice.customer_name}
           </div>
-          <div className="text-xs text-gray-400 dark:text-[#5C5A56] mt-0.5">
+          <div className="text-xs text-gray-400 dark:text-[#98989D] mt-0.5">
             {formatDate(invoice.invoice_date)}
           </div>
         </div>
@@ -68,23 +70,17 @@ function InvoiceCard({ invoice, isSelected, onToggle, t }: { invoice: any, isSel
             {formatINR(invoice.total)}
           </div>
           <div className="mt-1 flex justify-end">
-            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-widest ${
-              isPaid ? 'bg-green-100 text-green-700 dark:bg-[#1A2E1F] dark:text-[#2BB673]' :
-              isPartial ? 'bg-yellow-100 text-yellow-700 dark:bg-[#2E281A] dark:text-[#F4B23E]' :
-              'bg-red-100 text-red-700 dark:bg-[#2E1A1A] dark:text-[#E63946]'
-            }`}>
-              {t('invoices', invoice.payment_status)}
-            </span>
+            <PaymentStatusBadge status={invoice.payment_status} balanceDue={invoice.balance_due} />
           </div>
         </div>
       </div>
 
-      <div className="pt-3 mt-3 border-t border-gray-50 dark:border-[#2E2C28] flex justify-between items-center">
-        <div className="text-xs text-gray-500 dark:text-[#9A9690]">
+      <div className="pt-3 mt-3 border-t border-gray-50 dark:border-[#38383A] flex justify-between items-center">
+        <div className="text-xs text-gray-500 dark:text-[#98989D]">
           {t('invoices', 'balance')}: <span className="font-bold text-gray-900 dark:text-white">{formatINR(invoice.balance_due)}</span>
         </div>
         
-        <Link href={`/invoices/${invoice.id}`} className="text-[#1B7A4A] dark:text-[#2BB673] text-xs font-bold hover:underline">
+        <Link href={`/invoices/${invoice.id}`} className="text-[#1B7A4A] dark:text-[#25D366] text-xs font-bold hover:underline">
           {t('invoices', 'view_details')} →
         </Link>
       </div>
@@ -95,14 +91,18 @@ function InvoiceCard({ invoice, isSelected, onToggle, t }: { invoice: any, isSel
 /* ─── Skeleton ─── */
 function Skeleton() {
   return (
-    <div className="animate-pulse bg-gray-100 dark:bg-[#2E2C28] rounded-2xl h-32 w-full" />
+    <div className="animate-pulse bg-gray-100 dark:bg-[#38383A] rounded-2xl h-32 w-full" />
   )
 }
 
 /* ─── Main Page ─── */
 export default function InvoicesPage() {
-  const utils = trpc.useUtils ? trpc.useUtils() : (trpc as any).useContext()
+  const utils = trpc.useUtils()
   const { t } = useTranslation()
+  // Bulk mark paid is manager and owner only (blueprint C4); the
+  // router enforces it, the UI mirrors it for cashiers.
+  const { role } = useShop()
+  const canBulkPay = role !== 'cashier'
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -161,7 +161,7 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             {t('invoices', 'title')} 🧾
           </h1>
-          <p className="text-sm text-gray-400 dark:text-[#5C5A56] mt-0.5">
+          <p className="text-sm text-gray-400 dark:text-[#98989D] mt-0.5">
             {isLoading ? '...' : `${invoices?.length ?? 0} ${t('invoices', 'bills_found')}`}
           </p>
         </div>
@@ -178,24 +178,24 @@ export default function InvoicesPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
           <div className="relative flex-1 max-w-md">
-            <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C5A56] w-4 h-4 pointer-events-none" />
+            <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#98989D] w-4 h-4 pointer-events-none" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('invoices', 'search')}
-              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#5C5A56] outline-none focus:border-[#1B7A4A] dark:focus:border-[#2BB673] transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#98989D] outline-none focus:border-[#1B7A4A] dark:focus:border-[#25D366] transition-colors"
             />
           </div>
           
-          <div className="flex bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-xl p-1 overflow-x-auto hide-scrollbar">
-            {['all', 'unpaid', 'paid'].map((tab) => (
+          <div className="flex bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl p-1 overflow-x-auto hide-scrollbar">
+            {['all', 'unpaid', 'partial', 'paid'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setStatus(tab)}
                 className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold capitalize whitespace-nowrap transition-colors ${
                   status === tab 
-                    ? 'bg-gray-100 dark:bg-[#252320] text-gray-900 dark:text-white shadow-sm' 
-                    : 'text-gray-500 hover:text-gray-700 dark:text-[#9A9690] dark:hover:text-white'
+                    ? 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-900 dark:text-white shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700 dark:text-[#98989D] dark:hover:text-white'
                 }`}
               >
                 {tab === 'all' ? 'All' : t('invoices', tab)}
@@ -205,13 +205,13 @@ export default function InvoicesPage() {
         </div>
 
         {/* View Toggle */}
-        <div className="flex p-1 bg-white dark:bg-[#161513] border border-gray-200 dark:border-[#2E2C28] rounded-xl shadow-sm shrink-0">
+        <div className="flex p-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-sm shrink-0">
           <button
             onClick={() => setViewMode('grid')}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
               viewMode === 'grid' 
                 ? 'bg-[#1B7A4A] text-white shadow-md' 
-                : 'text-gray-500 hover:text-gray-900 dark:text-[#9A9690] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#252320]'
+                : 'text-gray-500 hover:text-gray-900 dark:text-[#98989D] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
             }`}
           >
             <GridIcon className="w-4 h-4" />
@@ -221,7 +221,7 @@ export default function InvoicesPage() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
               viewMode === 'list' 
                 ? 'bg-[#1B7A4A] text-white shadow-md' 
-                : 'text-gray-500 hover:text-gray-900 dark:text-[#9A9690] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#252320]'
+                : 'text-gray-500 hover:text-gray-900 dark:text-[#98989D] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
             }`}
           >
             <ListIcon className="w-4 h-4" />
@@ -240,7 +240,7 @@ export default function InvoicesPage() {
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
             {search || status !== 'all' ? t('invoices', 'no_bills_found') : t('invoices', 'no_bills_yet')}
           </h3>
-          <p className="text-sm text-gray-400 dark:text-[#5C5A56] mb-6 max-w-xs">
+          <p className="text-sm text-gray-400 dark:text-[#98989D] mb-6 max-w-xs">
             {search || status !== 'all' ? t('invoices', 'try_filter') : t('invoices', 'create_first_business')}
           </p>
           {(!search && status === 'all') && (
@@ -265,10 +265,10 @@ export default function InvoicesPage() {
           ))}
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#161513] border border-gray-100 dark:border-[#2E2C28] rounded-2xl overflow-hidden shadow-sm overflow-x-auto hide-scrollbar">
+        <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl overflow-hidden shadow-sm overflow-x-auto hide-scrollbar">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
-              <tr className="bg-gray-50/50 dark:bg-[#1C1C1E] border-b border-gray-100 dark:border-[#2E2C28]">
+              <tr className="bg-gray-50/50 dark:bg-[#1C1C1E] border-b border-gray-100 dark:border-[#38383A]">
                 <th className="p-4 w-12 text-center">
                   <input 
                     type="checkbox"
@@ -286,14 +286,14 @@ export default function InvoicesPage() {
                 <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-[#2E2C28]">
+            <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
               {invoices.map((inv) => {
                 const isPaid = inv.payment_status === 'paid'
                 const isPartial = inv.payment_status === 'partial'
                 return (
                   <tr 
                     key={inv.id} 
-                    className={`hover:bg-gray-50/50 dark:hover:bg-[#252320] transition-colors ${selectedIds.has(inv.id) ? 'bg-[#1B7A4A]/5' : ''}`}
+                    className={`hover:bg-gray-50/50 dark:hover:bg-[#2C2C2E] transition-colors ${selectedIds.has(inv.id) ? 'bg-[#1B7A4A]/5' : ''}`}
                     onClick={() => {
                       if (!isPaid) handleToggle(inv.id)
                     }}
@@ -315,25 +315,19 @@ export default function InvoicesPage() {
                       <div className="font-bold text-sm text-gray-900 dark:text-white">{inv.customer_name}</div>
                     </td>
                     <td className="p-4">
-                      <div className="text-sm text-gray-600 dark:text-[#9A9690]">{formatDate(inv.invoice_date)}</div>
+                      <div className="text-sm text-gray-600 dark:text-[#98989D]">{formatDate(inv.invoice_date)}</div>
                     </td>
                     <td className="p-4 text-right">
                       <div className="font-extrabold text-sm text-gray-900 dark:text-white">{formatINR(inv.total)}</div>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-widest ${
-                        isPaid ? 'bg-green-100 text-green-700 dark:bg-[#1A2E1F] dark:text-[#2BB673]' :
-                        isPartial ? 'bg-yellow-100 text-yellow-700 dark:bg-[#2E281A] dark:text-[#F4B23E]' :
-                        'bg-red-100 text-red-700 dark:bg-[#2E1A1A] dark:text-[#E63946]'
-                      }`}>
-                        {t('invoices', inv.payment_status)}
-                      </span>
+                      <PaymentStatusBadge status={inv.payment_status} balanceDue={inv.balance_due} />
                     </td>
                     <td className="p-4 text-right">
                       <div className="font-bold text-sm text-gray-900 dark:text-white">{formatINR(inv.balance_due)}</div>
                     </td>
                     <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Link href={`/invoices/${inv.id}`} className="text-[#1B7A4A] dark:text-[#2BB673] text-xs font-bold hover:underline">
+                      <Link href={`/invoices/${inv.id}`} className="text-[#1B7A4A] dark:text-[#25D366] text-xs font-bold hover:underline">
                         {t('invoices', 'view_details')} →
                       </Link>
                     </td>
@@ -361,13 +355,15 @@ export default function InvoicesPage() {
             >
               {t('common', 'cancel')}
             </button>
-            <button 
+            {canBulkPay && (
+            <button
               onClick={handleBulkMarkPaid}
               disabled={bulkMarkPaidMut.isPending}
               className="bg-[#1B7A4A] hover:bg-[#155F3A] text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg transition-colors disabled:opacity-50"
             >
               {bulkMarkPaidMut.isPending ? t('invoices', 'saving') : t('invoices', 'mark_paid')}
             </button>
+            )}
           </div>
         </div>
       )}

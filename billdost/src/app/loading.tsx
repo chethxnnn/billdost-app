@@ -2,7 +2,7 @@ import React from 'react'
 
 export default function Loading() {
   return (
-    <div className="fixed inset-0 z-[9999] bg-[#FAFAFA]/80 dark:bg-[#09090B]/80 backdrop-blur-xl flex flex-col items-center justify-center transition-all duration-500">
+    <div className="fixed inset-0 z-[9999] bg-[#F5F5F7]/80 dark:bg-[#000000]/80 backdrop-blur-xl flex flex-col items-center justify-center transition-all duration-500">
       <div className="relative flex flex-col items-center">
         {/* Pulse rings behind the logo */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[#1B7A4A]/10 dark:bg-[#25D366]/10 rounded-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite]"></div>

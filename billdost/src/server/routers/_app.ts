@@ -8,6 +8,11 @@ import { reportsRouter } from './reports'
 import { staffRouter } from './staff'
 import { settingsRouter } from './settings'
 import { aiRouter } from './ai'
+import { whatsappRouter } from './whatsapp'
+import { searchRouter } from './search'
+import { remindersRouter } from './reminders'
+import { expensesRouter } from './expenses'
+import { paymentsRouter } from './payments'
 
 /**
  * Root tRPC app router.
@@ -23,6 +28,11 @@ export const appRouter = router({
   staff: staffRouter,
   settings: settingsRouter,
   ai: aiRouter,
+  whatsapp: whatsappRouter,
+  search: searchRouter,
+  reminders: remindersRouter,
+  expenses: expensesRouter,
+  payments: paymentsRouter,
 })
 
 export type AppRouter = typeof appRouter

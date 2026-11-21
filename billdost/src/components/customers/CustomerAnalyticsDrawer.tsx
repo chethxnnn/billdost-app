@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/i18n/useTranslation'
+import { PaymentStatusBadge } from '@/components/invoices/PaymentStatusBadge'
 
 /* ─── Helpers ─── */
 const formatINR = (n: number) =>
@@ -20,7 +21,7 @@ const formatDate = (d: string) => {
 
 const avatarColor = (name: string) => {
   const colors = [
-    ['#0D2E1F', '#2BB673'], ['#1a1a2e', '#4361ee'], ['#2d1b00', '#f48c06'],
+    ['#0D2E1F', '#25D366'], ['#1a1a2e', '#4361ee'], ['#2d1b00', '#f48c06'],
     ['#1a0a0a', '#e63946'], ['#0a1a2d', '#4cc9f0'], ['#1a0d2e', '#7b2d8b'],
   ]
   return colors[(name || 'A').charCodeAt(0) % colors.length]
@@ -59,7 +60,7 @@ export default function CustomerAnalyticsDrawer({
       />
 
       {/* Drawer */}
-      <div className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-[#F5F5F7] dark:bg-[#0F0E0C] shadow-2xl z-[70] flex flex-col transform transition-transform duration-300 ease-in-out border-l border-white/20 dark:border-white/5">
+      <div className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-[#F5F5F7] dark:bg-[#000000] shadow-2xl z-[70] flex flex-col transform transition-transform duration-300 ease-in-out border-l border-white/20 dark:border-white/5">
         
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-black/5 dark:border-white/5 bg-white dark:bg-[#1C1C1E] flex items-center justify-between sticky top-0 z-10">
@@ -147,13 +148,7 @@ export default function CustomerAnalyticsDrawer({
                               <p className="text-sm font-bold text-gray-900 dark:text-white">{formatINR(inv.total)}</p>
                             </div>
                             <div className="text-right">
-                              <span className={`px-2 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-widest ${
-                                inv.payment_status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400' :
-                                inv.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400' :
-                                'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400'
-                              }`}>
-                                {inv.payment_status}
-                              </span>
+                              <PaymentStatusBadge status={inv.payment_status} />
                             </div>
                           </Link>
                         </li>
