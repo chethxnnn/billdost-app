@@ -8,13 +8,21 @@
 }
 
 /*
-  BillDost Admin Portal design system (master plan, Section 7).
-  Ground #F5F5F7, ink #1D1D1F, one accent: BillDost green #1B7A4A.
-  Status colours only where they mean something. Cards are white with
-  hairline borders and 16px radius; no heavy shadows. Motion is 200 to
-  300ms, transform and opacity only, and the shell never remounts:
-  only .page-enter content animates.
+  BillDost Admin Portal design system (Dock + Canvas, approved Nov 22).
+  Ground #F5F5F7, ink #1D1D1F, one accent: BillDost green #1B7A4A
+  (dark: #25D366). Cards are white with hairline borders and a 20px
+  radius on ONE padding scale; every card row shares a fixed leading
+  tile or avatar column, content on shared baselines, and trailing
+  values right-aligned in tabular numbers. Frosted material lives
+  only on the header, the dock and overlays. Motion is transform and
+  opacity only, spring cubic-bezier(.32,.72,.24,1), under 300ms. The
+  theme is a manual per-user choice: light by default, dark only when
+  the admin picks it. Nothing follows the OS setting.
 */
+
+:root {
+  --spring: cubic-bezier(0.32, 0.72, 0.24, 1);
+}
 
 html {
   scroll-behavior: smooth;
@@ -24,6 +32,11 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+h1,
+h2 {
+  letter-spacing: -0.02em;
 }
 
 @keyframes page-enter {
@@ -38,7 +51,7 @@ body {
 }
 
 .page-enter {
-  animation: page-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-enter 240ms var(--spring) both;
 }
 
 @keyframes fade-in {
@@ -66,13 +79,65 @@ body {
 }
 
 .pop-in {
-  animation: pop-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pop-in 220ms var(--spring) both;
+}
+
+/* Profile popover: grows out of the avatar, top right. */
+@keyframes pop-in-tr {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.pop-in-tr {
+  transform-origin: top right;
+  animation: pop-in-tr 240ms var(--spring) both;
+}
+
+/* Bottom sheet (More menu on phones): rises from the dock. */
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sheet-up {
+  animation: sheet-up 260ms var(--spring) both;
+}
+
+/* Dock entrance: settles up into place once per shell mount. */
+@keyframes dock-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.dock-in {
+  animation: dock-in 320ms var(--spring) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .page-enter,
   .fade-in,
-  .pop-in {
+  .pop-in,
+  .pop-in-tr,
+  .sheet-up,
+  .dock-in {
     animation: none;
   }
   html {

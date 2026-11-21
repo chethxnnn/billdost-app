@@ -16,6 +16,9 @@ export type Capability =
   | 'applications'
   | 'shop_setup'
   | 'activation_actions'
+  | 'activation_approve'
+  | 'assign'
+  | 'call_log'
   | 'shops_view'
   | 'support_notes'
   | 'issues'
@@ -25,6 +28,7 @@ export type Capability =
   | 'finance_export'
   | 'plan_edit'
   | 'unmask'
+  | 'team_view'
   | 'team_manage'
   | 'suspend_shop'
   | 'settings'
@@ -36,7 +40,14 @@ const MATRIX: Record<Capability, AdminRole[]> = {
   dashboard: ['founder', 'co_founder', 'support', 'analyst'],
   applications: ['founder', 'co_founder', 'support'],
   shop_setup: ['founder', 'co_founder', 'support'],
-  activation_actions: ['founder', 'co_founder', 'support'],
+  // The founder approval gate (Nov 22): teammates prepare setups,
+  // but releasing an activation link, and approving a prepared shop,
+  // are founder-level decisions. Support lost activation_actions;
+  // loosening this is a one-line change, only on the founder's word.
+  activation_actions: ['founder', 'co_founder'],
+  activation_approve: ['founder', 'co_founder'],
+  assign: ['founder', 'co_founder', 'support'],
+  call_log: ['founder', 'co_founder', 'support'],
   shops_view: ['founder', 'co_founder', 'support', 'finance'],
   support_notes: ['founder', 'co_founder', 'support'],
   issues: ['founder', 'co_founder', 'support'],
@@ -46,6 +57,9 @@ const MATRIX: Record<Capability, AdminRole[]> = {
   finance_export: ['founder', 'co_founder', 'finance'],
   plan_edit: ['founder', 'co_founder', 'finance'],
   unmask: ['founder'],
+  // Everyone on the team can see the directory, assignments and
+  // their own stats; managing people stays founder-level.
+  team_view: ALL,
   team_manage: ['founder', 'co_founder'],
   suspend_shop: ['founder', 'co_founder'],
   settings: ['founder', 'co_founder'],
@@ -71,7 +85,7 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<AdminRole, string> = {
   founder: 'Everything, including team, unmasking and settings.',
   co_founder: 'Everything except managing the founder account.',
-  support: 'Applications, shop setup help, issues and shop support. No finance, no broadcasts.',
+  support: 'Applications, calls, issues and shop support. Prepares shop setups; the founder approves them and releases activation links. No finance, no broadcasts.',
   finance: 'Finance views, plan edits and exports. No shop operations.',
   analyst: 'Read-only dashboard and reports.',
 }

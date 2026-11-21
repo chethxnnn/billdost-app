@@ -28,13 +28,23 @@ export default async function IssuesPage({
   const { data: rows } = await supabase
     .from('client_errors')
     .select(
-      'digest, error_name, message, route, shop_id, issue_status, internal_note, created_at, stack, app_version'
+      'digest, error_name, message, route, shop_id, issue_status, internal_note, created_at, stack, app_version, assignee_id, started_at'
     )
     .order('created_at', { ascending: false })
     .limit(1000)
 
   const { data: shops } = await supabase.from('shops').select('id, name')
   const shopName = new Map((shops ?? []).map((s) => [s.id as string, s.name as string]))
+
+  const { data: members } = await supabase
+    .from('admin_users')
+    .select('id, display_name')
+    .eq('status', 'active')
+    .order('display_name')
+  const memberOptions = (members ?? []).map((m) => ({
+    id: m.id as string,
+    name: m.display_name as string,
+  }))
 
   const groups = new Map<string, IssueGroup & { shopIds: Set<string> }>()
   for (const row of rows ?? []) {
@@ -53,6 +63,8 @@ export default async function IssuesPage({
         lastSeen: row.created_at as string,
         status: row.issue_status as string,
         note: (row.internal_note as string) ?? null,
+        assigneeId: (row.assignee_id as string) ?? null,
+        startedAt: (row.started_at as string) ?? null,
         sample: {
           message: (row.message as string) ?? null,
           stack: (row.stack as string) ?? null,
@@ -121,6 +133,9 @@ export default async function IssuesPage({
               group={g}
               canEdit={can(admin.role, 'issues_status')}
               highlighted={highlight === g.digest}
+              members={memberOptions}
+              currentAdminId={admin.id}
+              canAssign={can(admin.role, 'assign')}
             />
           ))}
         </div>

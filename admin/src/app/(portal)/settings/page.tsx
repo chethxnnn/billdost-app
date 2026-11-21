@@ -31,6 +31,7 @@ export default async function SettingsPage() {
         subtitle="The few platform values that are safe to change from a screen. Keys stay in the environment."
       />
       <SettingsForm
+        uiTheme={admin.uiTheme}
         supportPhone={settings.get('support_phone') ?? ''}
         landingUrl={settings.get('landing_url') ?? 'https://billdost.in'}
         waConnected={whatsappConfigured()}

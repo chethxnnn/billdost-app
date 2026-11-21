@@ -22,10 +22,17 @@ export default async function ShopsPage({
 
   const { data: shops } = await supabase
     .from('shops')
-    .select('id, name, category, status, plan, created_at')
+    .select('id, name, category, status, plan, created_at, support_owner_id')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(300)
+
+  const { data: members } = await supabase
+    .from('admin_users')
+    .select('id, display_name')
+  const memberName = new Map(
+    (members ?? []).map((m) => [m.id as string, m.display_name as string])
+  )
   const shopList = shops ?? []
   const shopIds = shopList.map((s) => s.id as string)
 
@@ -72,6 +79,10 @@ export default async function ShopsPage({
     bills: billsByShop.get(s.id as string) ?? 0,
     lastBillAt: lastBillByShop.get(s.id as string) ?? null,
     createdAt: s.created_at as string,
+    supportOwnerId: (s.support_owner_id as string) ?? null,
+    supportOwnerName: s.support_owner_id
+      ? memberName.get(s.support_owner_id as string) ?? null
+      : null,
   }))
 
   return (

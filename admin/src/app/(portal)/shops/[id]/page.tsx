@@ -12,6 +12,9 @@ import {
 } from '@/components/ui'
 import ActivationPanel from '@/components/ActivationPanel'
 import ShopActions from '@/components/ShopActions'
+import ApprovalCard from '@/components/ApprovalCard'
+import AssignControl from '@/components/AssignControl'
+import CallLogForm, { CALL_OUTCOME_LABELS } from '@/components/CallLogForm'
 import NotesPanel, { type SupportNote } from '@/components/NotesPanel'
 import PlanForm from '@/components/PlanForm'
 import CustomersBlock from '@/components/CustomersBlock'
@@ -55,6 +58,8 @@ export default async function ShopDetailPage({
     auditRes,
     adminsRes,
     requestRes,
+    createdRes,
+    shopCallsRes,
   ] = await Promise.all([
     supabase
       .from('invoices')
@@ -128,6 +133,20 @@ export default async function ShopDetailPage({
       .eq('converted_shop_id', id)
       .limit(1)
       .single(),
+    supabase
+      .from('admin_audit_log')
+      .select('admin_user_id, created_at')
+      .eq('shop_id', id)
+      .eq('action', 'shop_created')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single(),
+    supabase
+      .from('call_logs')
+      .select('outcome, note, admin_id, created_at')
+      .eq('shop_id', id)
+      .order('created_at', { ascending: false })
+      .limit(5),
   ])
 
   const invoices = invoicesRes.data ?? []
@@ -154,6 +173,19 @@ export default async function ShopDetailPage({
   const staff = staffRes.data ?? []
   const owner = staff.find((s) => s.role === 'owner')
   const adminName = new Map((adminsRes.data ?? []).map((a) => [a.id as string, a.display_name as string]))
+  const memberOptions = (adminsRes.data ?? []).map((a) => ({
+    id: a.id as string,
+    name: a.display_name as string,
+  }))
+  const preparedByName = createdRes.data?.admin_user_id
+    ? adminName.get(createdRes.data.admin_user_id as string) ?? null
+    : null
+  const shopCalls = (shopCallsRes.data ?? []).map((c) => ({
+    outcome: c.outcome as string,
+    note: (c.note as string) ?? null,
+    adminName: c.admin_id ? adminName.get(c.admin_id as string) ?? 'Team' : 'Team',
+    created_at: c.created_at as string,
+  }))
   const notes: SupportNote[] = (notesRes.data ?? []).map((n) => ({
     id: n.id as string,
     note: n.note as string,
@@ -200,6 +232,26 @@ export default async function ShopDetailPage({
         </Card>
       ) : null}
 
+      {shop.status === 'awaiting_approval' || shop.status === 'setup_returned' ? (
+        <ApprovalCard
+          shopId={id}
+          shopName={shop.name as string}
+          status={shop.status as string}
+          reviewNote={(shop.setup_review_note as string) ?? null}
+          reviewedByName={
+            shop.setup_reviewed_by
+              ? adminName.get(shop.setup_reviewed_by as string) ?? null
+              : null
+          }
+          reviewedAt={(shop.setup_reviewed_at as string) ?? null}
+          preparedByName={preparedByName}
+          preparedAt={(createdRes.data?.created_at as string) ?? null}
+          calls={shopCalls}
+          canApprove={can(admin.role, 'activation_approve')}
+          canSetup={can(admin.role, 'shop_setup')}
+        />
+      ) : null}
+
       {shop.status === 'pending_activation' ? (
         <Card className="p-5 md:p-6 mb-4">
           <h2 className="text-[16px] font-bold mb-1.5">Activation pending</h2>
@@ -211,7 +263,8 @@ export default async function ShopDetailPage({
             <ActivationPanel shopId={id} compact />
           ) : (
             <p className="text-[14px] font-medium text-[#5A5A5E] dark:text-[#A1A1A6]">
-              Your role cannot send activation links.
+              Activation links are released by the founder. This shop
+              is approved and waiting for them to send it.
             </p>
           )}
         </Card>
@@ -248,6 +301,17 @@ export default async function ShopDetailPage({
               </div>
             ))}
           </dl>
+          <div className="mt-4 pt-4 border-t border-black/[0.05] dark:border-white/[0.07]">
+            <AssignControl
+              entity="shop"
+              id={id}
+              assigneeId={(shop.support_owner_id as string) ?? null}
+              members={memberOptions}
+              currentAdminId={admin.id}
+              canAssign={can(admin.role, 'assign')}
+              label="Support owner"
+            />
+          </div>
           {requestRes.data ? (
             <Link href={`/applications/${requestRes.data.id}`} className="inline-block mt-4 text-[13px] font-bold text-[#1B7A4A] dark:text-[#25D366] hover:underline underline-offset-4">
               View the original request
@@ -348,6 +412,27 @@ export default async function ShopDetailPage({
         <Card className="p-5">
           <h2 className="text-[16px] font-bold mb-4">Support notes</h2>
           <NotesPanel shopId={id} notes={notes} canWrite={can(admin.role, 'support_notes')} />
+          <div className="mt-5 pt-4 border-t border-black/[0.05] dark:border-white/[0.07]">
+            <h3 className="text-[14px] font-bold mb-2">Calls</h3>
+            {shopCalls.length === 0 ? (
+              <p className="text-[13px] text-[#5A5A5E] dark:text-[#A1A1A6] font-medium mb-3">
+                No calls logged for this shop yet.
+              </p>
+            ) : (
+              <ul className="space-y-1.5 mb-3">
+                {shopCalls.map((c, i) => (
+                  <li key={i} className="text-[13px] font-medium">
+                    <span className="font-bold">{CALL_OUTCOME_LABELS[c.outcome] ?? c.outcome}</span>
+                    {c.note ? ` · ${c.note}` : ''}{' '}
+                    <span className="text-[#86868B]">
+                      by {c.adminName} · {formatDateTime(c.created_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {can(admin.role, 'call_log') ? <CallLogForm shopId={id} /> : null}
+          </div>
         </Card>
       </div>
 

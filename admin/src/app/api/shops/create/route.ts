@@ -69,5 +69,19 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  return NextResponse.json({ ok: true, shop_id: data })
+  // The landing status depends on who created the shop (migration
+  // 0022): founder-level creators are approved inline, teammate
+  // setups wait in awaiting_approval. Report it so the Studio can
+  // show the right next step.
+  const { data: created } = await supabase
+    .from('shops')
+    .select('status')
+    .eq('id', data as string)
+    .single()
+
+  return NextResponse.json({
+    ok: true,
+    shop_id: data,
+    status: (created?.status as string) ?? 'pending_activation',
+  })
 }

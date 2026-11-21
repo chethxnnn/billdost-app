@@ -29,7 +29,36 @@ export async function PATCH(
   const body = (await req.json().catch(() => null)) as {
     status?: string
     rejection_reason?: string
+    action?: string
   } | null
+
+  const supabase = createAdminClient()
+
+  // Start work on this request: stamps started_at so the Team
+  // screen can show who is doing what, right now.
+  if (body?.action === 'start') {
+    const { data: row } = await supabase
+      .from('access_requests')
+      .select('id, shop_name')
+      .eq('id', id)
+      .single()
+    if (!row) {
+      return NextResponse.json({ ok: false, error: 'Request not found.' }, { status: 404 })
+    }
+    const { error: startError } = await supabase
+      .from('access_requests')
+      .update({ started_at: new Date().toISOString() })
+      .eq('id', id)
+      .is('started_at', null)
+    if (startError) {
+      return NextResponse.json({ ok: false, error: 'Could not save.' }, { status: 500 })
+    }
+    await writeAudit(admin, 'request_started', {
+      requestId: id,
+      details: { shop_name: row.shop_name },
+    })
+    return NextResponse.json({ ok: true })
+  }
 
   const next = body?.status ?? ''
   if (!ALLOWED[next]) {
@@ -45,7 +74,6 @@ export async function PATCH(
     )
   }
 
-  const supabase = createAdminClient()
   const { data: current } = await supabase
     .from('access_requests')
     .select('status, shop_name')
@@ -67,6 +95,8 @@ export async function PATCH(
     .update({
       status: next,
       rejection_reason: next === 'rejected' ? body!.rejection_reason!.trim() : null,
+      // Advancing the pipeline ends the current work stint.
+      started_at: null,
     })
     .eq('id', id)
 

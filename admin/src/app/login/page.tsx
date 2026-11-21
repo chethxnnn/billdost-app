@@ -50,12 +50,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-[400px] page-enter">
         <div className="text-center mb-8">
-          <p className="font-extrabold text-[30px] tracking-tight">
-            <span>Bill</span>
-            <span className="text-[#1B7A4A] dark:text-[#25D366]">Dost</span>
-          </p>
-          <p className="text-[13px] font-bold uppercase tracking-widest text-[#5A5A5E] dark:text-[#A1A1A6] mt-1">
-            Admin Portal
+          <p className="font-extrabold text-[32px] tracking-[-0.02em]">BillDost</p>
+          <p className="text-[13px] font-bold uppercase tracking-widest text-[#86868B] mt-1">
+            Admin
           </p>
         </div>
 

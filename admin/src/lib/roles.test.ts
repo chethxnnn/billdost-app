@@ -20,12 +20,35 @@ describe('role gates (plan Section 12)', () => {
   it('support can run the floor but not finance or broadcasts', () => {
     expect(can('support', 'applications')).toBe(true)
     expect(can('support', 'shop_setup')).toBe(true)
-    expect(can('support', 'activation_actions')).toBe(true)
     expect(can('support', 'issues')).toBe(true)
     expect(can('support', 'finance_view')).toBe(false)
     expect(can('support', 'broadcasts')).toBe(false)
     expect(can('support', 'team_manage')).toBe(false)
     expect(can('support', 'suspend_shop')).toBe(false)
+  })
+
+  it('the founder approval gate: only founder and co-founder release activation', () => {
+    for (const role of ['founder', 'co_founder'] as const) {
+      expect(can(role, 'activation_actions')).toBe(true)
+      expect(can(role, 'activation_approve')).toBe(true)
+    }
+    for (const role of ['support', 'finance', 'analyst'] as const) {
+      expect(can(role, 'activation_actions')).toBe(false)
+      expect(can(role, 'activation_approve')).toBe(false)
+    }
+    // Teammates still help with onboarding: work, assign, log calls.
+    expect(can('support', 'assign')).toBe(true)
+    expect(can('support', 'call_log')).toBe(true)
+    expect(can('finance', 'assign')).toBe(false)
+    expect(can('analyst', 'call_log')).toBe(false)
+  })
+
+  it('everyone can view the team directory; managing stays founder-level', () => {
+    for (const role of ['founder', 'co_founder', 'support', 'finance', 'analyst'] as const) {
+      expect(can(role, 'team_view')).toBe(true)
+    }
+    expect(can('support', 'team_manage')).toBe(false)
+    expect(can('analyst', 'team_manage')).toBe(false)
   })
 
   it('finance sees money, not shop operations', () => {

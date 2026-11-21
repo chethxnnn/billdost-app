@@ -1019,4 +1019,198 @@ begin
 end;
 $$;
 
+-- ASSERT: team_theme_presence_and_support_fixture
+do $$
+declare
+  v_theme text;
+  v_active timestamptz;
+begin
+  insert into auth.users (id, email) values
+    ('aaaaaaaa-0000-0000-0000-000000000004', 'support@billdost.test')
+  on conflict (id) do nothing;
+  insert into public.admin_users (id, auth_user_id, display_name, email, role, status) values
+    ('a1111111-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000004', 'Support', 'support@billdost.test', 'support', 'active')
+  on conflict (id) do nothing;
+
+  update public.admin_users
+  set ui_theme = 'dark', last_active_at = now()
+  where id = 'a1111111-0000-0000-0000-000000000001';
+  select ui_theme, last_active_at into v_theme, v_active
+  from public.admin_users
+  where id = 'a1111111-0000-0000-0000-000000000001';
+  if v_theme <> 'dark' or v_active is null then
+    raise exception 'ASSERT FAIL theme/presence: theme %, active %', v_theme, v_active;
+  end if;
+
+  begin
+    update public.admin_users set ui_theme = 'auto'
+    where id = 'a1111111-0000-0000-0000-000000000001';
+    raise exception 'ASSERT FAIL theme: invalid ui_theme accepted';
+  exception when check_violation then null;
+  end;
+end;
+$$;
+
+-- ASSERT: approval_gate_support_shop_waits
+do $$
+declare
+  v_shop uuid;
+  v_status text;
+  v_approved int;
+begin
+  v_shop := public.admin_create_shop_tx(
+    'a1111111-0000-0000-0000-000000000004',
+    '{"shop_name":"Gate Support Shop","owner_name":"S","owner_mobile":"9000000011"}'::jsonb
+  );
+  select status into v_status from public.shops where id = v_shop;
+  if v_status <> 'awaiting_approval' then
+    raise exception 'ASSERT FAIL gate: support-created shop status %, expected awaiting_approval', v_status;
+  end if;
+  select count(*) into v_approved from public.admin_audit_log
+  where shop_id = v_shop and action = 'shop_approved';
+  if v_approved <> 0 then
+    raise exception 'ASSERT FAIL gate: support shop has an approval row';
+  end if;
+  insert into harness_state (k, v) values ('gate_support_shop', v_shop)
+  on conflict (k) do update set v = excluded.v;
+end;
+$$;
+
+-- ASSERT: approval_gate_token_blocked_until_approved
+do $$
+declare
+  v_shop uuid;
+  v_code text;
+  v_accepted boolean;
+  v_hash text := 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+begin
+  select v into v_shop from harness_state where k = 'gate_support_shop';
+
+  -- The founder himself cannot issue a link for an unapproved shop.
+  v_accepted := false; v_code := null;
+  begin
+    perform public.admin_issue_activation_tx(
+      'a1111111-0000-0000-0000-000000000001', v_shop, v_hash, 'manual');
+    v_accepted := true;
+  exception when others then v_code := sqlstate;
+  end;
+  if v_accepted or v_code <> 'P0001' then
+    raise exception 'ASSERT FAIL gate: founder issued token for awaiting_approval shop, code %', v_code;
+  end if;
+
+  -- Support may not issue links at all (role check fires first).
+  v_accepted := false; v_code := null;
+  begin
+    perform public.admin_issue_activation_tx(
+      'a1111111-0000-0000-0000-000000000004', v_shop, v_hash, 'manual');
+    v_accepted := true;
+  exception when others then v_code := sqlstate;
+  end;
+  if v_accepted or v_code <> '42501' then
+    raise exception 'ASSERT FAIL gate: support issued a token, code %', v_code;
+  end if;
+
+  if exists (select 1 from public.activation_tokens where shop_id = v_shop) then
+    raise exception 'ASSERT FAIL gate: a token row exists for an unapproved shop';
+  end if;
+end;
+$$;
+
+-- ASSERT: approval_gate_approve_then_issue_works
+do $$
+declare
+  v_shop uuid;
+  v_token uuid;
+  v_hash text := 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+begin
+  select v into v_shop from harness_state where k = 'gate_support_shop';
+
+  -- The founder approval step (the portal does this via its API;
+  -- here the state move itself is what the gate depends on).
+  update public.shops set status = 'pending_activation' where id = v_shop;
+
+  v_token := public.admin_issue_activation_tx(
+    'a1111111-0000-0000-0000-000000000001', v_shop, v_hash, 'whatsapp');
+  if v_token is null then
+    raise exception 'ASSERT FAIL gate: no token after approval';
+  end if;
+end;
+$$;
+
+-- ASSERT: approval_gate_founder_shop_inline_approved
+do $$
+declare
+  v_shop uuid;
+  v_status text;
+  v_approved int;
+begin
+  v_shop := public.admin_create_shop_tx(
+    'a1111111-0000-0000-0000-000000000001',
+    '{"shop_name":"Gate Founder Shop","owner_name":"F","owner_mobile":"9000000012"}'::jsonb
+  );
+  select status into v_status from public.shops where id = v_shop;
+  if v_status <> 'pending_activation' then
+    raise exception 'ASSERT FAIL gate: founder-created shop status %, expected pending_activation', v_status;
+  end if;
+  select count(*) into v_approved from public.admin_audit_log
+  where shop_id = v_shop and action = 'shop_approved'
+    and (details ->> 'inline') = 'true';
+  if v_approved <> 1 then
+    raise exception 'ASSERT FAIL gate: inline approval not audit-logged';
+  end if;
+end;
+$$;
+
+-- ASSERT: assignment_claim_and_call_log_flow
+do $$
+declare
+  v_req uuid;
+  v_assignee uuid;
+  v_started timestamptz;
+  v_calls int;
+  v_accepted boolean;
+begin
+  insert into public.access_requests (shop_name, owner_name, whatsapp_number, category, created_at)
+  values ('Assign Test Store', 'A Owner', '9000000021', 'kirana', now() - interval '3 hours')
+  returning id into v_req;
+
+  update public.access_requests
+  set assignee_id = 'a1111111-0000-0000-0000-000000000004',
+      claimed_at = now(), started_at = now()
+  where id = v_req;
+  select assignee_id, started_at into v_assignee, v_started
+  from public.access_requests where id = v_req;
+  if v_assignee <> 'a1111111-0000-0000-0000-000000000004' or v_started is null then
+    raise exception 'ASSERT FAIL assign: request assignment did not stick';
+  end if;
+
+  insert into public.call_logs (admin_id, request_id, outcome, note)
+  values ('a1111111-0000-0000-0000-000000000004', v_req, 'answered', 'Spoke to owner');
+  select count(*) into v_calls from public.call_logs where request_id = v_req;
+  if v_calls <> 1 then
+    raise exception 'ASSERT FAIL call log: expected 1 row, got %', v_calls;
+  end if;
+
+  v_accepted := false;
+  begin
+    insert into public.call_logs (admin_id, request_id, outcome)
+    values ('a1111111-0000-0000-0000-000000000004', v_req, 'shouted');
+    v_accepted := true;
+  exception when check_violation then null;
+  end;
+  if v_accepted then
+    raise exception 'ASSERT FAIL call log: invalid outcome accepted';
+  end if;
+
+  -- Attention smoke: the seeded request is findable by the exact
+  -- columns the attention engine reads (status, assignee, stamps).
+  if not exists (
+    select 1 from public.access_requests
+    where id = v_req and status = 'new' and assignee_id is not null
+  ) then
+    raise exception 'ASSERT FAIL attention smoke: seeded request not readable';
+  end if;
+end;
+$$;
+
 select 'HARNESS_ASSERTIONS_COMPLETE' as pass_marker;

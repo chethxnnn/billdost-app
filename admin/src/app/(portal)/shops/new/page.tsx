@@ -41,10 +41,10 @@ export default async function ShopSetupPage({
   return (
     <div>
       <PageHeader
-        title="Set up a shop"
-        subtitle="Fill this during or just after the call. The shop is created in one transaction, then you send the activation link."
+        title="Setup Studio"
+        subtitle="Fill this during or just after the call. The preview shows what the shopkeeper will see, as you type."
       />
-      <SetupForm initial={initial} />
+      <SetupForm initial={initial} canActivate={can(admin.role, 'activation_actions')} />
     </div>
   )
 }

@@ -2,10 +2,13 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 /**
- * Shared portal primitives (master plan, Section 7): white cards with
- * hairline borders and 16px radius, one green primary action per
- * screen, status pills that always carry a word, calm empty and error
- * states. No prop controls: everything rendered here works.
+ * Shared portal primitives (Dock + Canvas system, Nov 22): white
+ * cards with hairline borders and a 20px radius on one padding
+ * scale. Every card row follows one internal system: a fixed leading
+ * tile or avatar column, content on shared baselines, trailing
+ * values right-aligned in tabular numbers. One green primary action
+ * per screen, status pills that always carry a word, calm empty and
+ * error states. No prop controls: everything rendered here works.
  */
 
 export const btnPrimary =
@@ -32,10 +35,84 @@ export function Card({
 }) {
   return (
     <div
-      className={`bg-white dark:bg-[#1C1C1E] border border-black/[0.06] dark:border-white/[0.08] rounded-2xl ${className}`}
+      className={`bg-white dark:bg-[#1C1C1E] border border-black/[0.06] dark:border-white/[0.08] rounded-[20px] ${className}`}
     >
       {children}
     </div>
+  )
+}
+
+/**
+ * The fixed leading column of the card system: a 40px coloured tile
+ * with one icon, or an avatar. Rows align because this column never
+ * changes size.
+ */
+const TILE_TONES: Record<string, string> = {
+  green: 'bg-[#1B7A4A]/10 text-[#14663C] dark:bg-[#25D366]/15 dark:text-[#25D366]',
+  blue: 'bg-[#175CD3]/10 text-[#175CD3] dark:bg-[#175CD3]/25 dark:text-[#84B4F0]',
+  purple: 'bg-[#7A4FA3]/10 text-[#7A4FA3] dark:bg-[#7A4FA3]/25 dark:text-[#C4A6E8]',
+  amber: 'bg-[#B25E09]/10 text-[#9A5B07] dark:bg-[#B25E09]/25 dark:text-[#E8B06A]',
+  teal: 'bg-[#0E7490]/10 text-[#0E7490] dark:bg-[#0E7490]/25 dark:text-[#6AC3E8]',
+  pink: 'bg-[#B3261E]/10 text-[#B3261E] dark:bg-[#B3261E]/25 dark:text-[#F0938C]',
+  neutral: 'bg-black/[0.05] text-[#5A5A5E] dark:bg-white/[0.08] dark:text-[#A1A1A6]',
+}
+
+export function Tile({
+  tone = 'neutral',
+  children,
+}: {
+  tone?: keyof typeof TILE_TONES
+  children: ReactNode
+}) {
+  return (
+    <span
+      className={`w-10 h-10 shrink-0 rounded-[12px] flex items-center justify-center ${TILE_TONES[tone]}`}
+      aria-hidden
+    >
+      {children}
+    </span>
+  )
+}
+
+const AVATAR_BG = ['#7A4FA3', '#175CD3', '#B25E09', '#0B7A3E', '#3A3A3C']
+
+export function avatarColor(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return AVATAR_BG[h % AVATAR_BG.length]
+}
+
+export function Avatar({
+  name,
+  size = 40,
+  presence,
+}: {
+  name: string
+  size?: number
+  presence?: 'active' | 'away' | null
+}) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join('')
+  return (
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+      <span
+        className="w-full h-full rounded-full flex items-center justify-center text-white font-bold"
+        style={{ backgroundColor: avatarColor(name), fontSize: size * 0.36 }}
+      >
+        {initials || '?'}
+      </span>
+      {presence ? (
+        <span
+          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-[#1C1C1E] ${
+            presence === 'active' ? 'bg-[#1B7A4A] dark:bg-[#25D366]' : 'bg-[#C7C7CC]'
+          }`}
+        />
+      ) : null}
+    </span>
   )
 }
 
@@ -136,6 +213,8 @@ export function Pill({ tone, children }: { tone: Tone; children: ReactNode }) {
 const SHOP_STATUS: Record<string, { tone: Tone; label: string }> = {
   live: { tone: 'green', label: 'Live' },
   pending_activation: { tone: 'amber', label: 'Pending activation' },
+  awaiting_approval: { tone: 'amber', label: 'Awaiting approval' },
+  setup_returned: { tone: 'red', label: 'Changes requested' },
   suspended: { tone: 'red', label: 'Suspended' },
 }
 

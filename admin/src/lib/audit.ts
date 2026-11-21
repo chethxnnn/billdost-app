@@ -33,4 +33,13 @@ export async function writeAudit(
     console.error('admin_audit_log write failed', { action, error: error.message })
     throw new Error('audit_write_failed')
   }
+  // An audited action is also a presence signal: the acting admin is
+  // here, now. Best effort only; presence must never fail an action.
+  if (admin) {
+    await supabase
+      .from('admin_users')
+      .update({ last_active_at: new Date().toISOString() })
+      .eq('id', admin.id)
+      .then(undefined, () => undefined)
+  }
 }

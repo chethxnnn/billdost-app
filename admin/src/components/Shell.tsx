@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -13,12 +14,14 @@ import {
   Settings as SettingsIcon,
   ScrollText,
   LogOut,
-  Sun,
-  Moon,
-  MoreHorizontal,
+  UserRound,
+  Plus,
+  LayoutGrid,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { can, ROLE_LABELS, type AdminRole, type Capability } from '@/lib/roles'
+import { Avatar } from '@/components/ui'
+import ThemeControl, { applyTheme, type UiTheme } from '@/components/ThemeControl'
 import QuickFinder from './QuickFinder'
 
 interface NavItem {
@@ -28,84 +31,110 @@ interface NavItem {
   capability?: Capability
 }
 
-const GROUPS: { label: string; items: NavItem[] }[] = [
-  {
-    label: 'Overview',
-    items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, capability: 'dashboard' }],
-  },
-  {
-    label: 'Work',
-    items: [
-      { href: '/applications', label: 'Applications', icon: Inbox, capability: 'applications' },
-      { href: '/shops', label: 'Shops', icon: Store, capability: 'shops_view' },
-      { href: '/issues', label: 'Issues', icon: Bug, capability: 'issues' },
-    ],
-  },
-  {
-    label: 'Reach',
-    items: [{ href: '/broadcasts', label: 'Broadcasts', icon: Megaphone, capability: 'broadcasts' }],
-  },
-  {
-    label: 'Business',
-    items: [{ href: '/finance', label: 'Finance', icon: Wallet, capability: 'finance_view' }],
-  },
-  {
-    label: 'System',
-    items: [
-      { href: '/team', label: 'Team', icon: Users, capability: 'team_manage' },
-      { href: '/settings', label: 'Settings', icon: SettingsIcon, capability: 'settings' },
-      { href: '/audit', label: 'Audit log', icon: ScrollText, capability: 'audit_view' },
-    ],
-  },
-]
-
-const MOBILE_MAIN: NavItem[] = [
-  { href: '/dashboard', label: 'Home', icon: LayoutDashboard, capability: 'dashboard' },
-  { href: '/applications', label: 'Requests', icon: Inbox, capability: 'applications' },
+/** The dock: the five places the team lives in all day. */
+const DOCK: NavItem[] = [
+  { href: '/dashboard', label: 'Today', icon: LayoutDashboard, capability: 'dashboard' },
+  { href: '/applications', label: 'Pipeline', icon: Inbox, capability: 'applications' },
   { href: '/shops', label: 'Shops', icon: Store, capability: 'shops_view' },
   { href: '/issues', label: 'Issues', icon: Bug, capability: 'issues' },
+  { href: '/team', label: 'Team', icon: Users, capability: 'team_view' },
+]
+
+/** Everything else, one tap away in the More sheet. */
+const MORE: NavItem[] = [
+  { href: '/shops/new', label: 'Set up a shop', icon: Plus, capability: 'shop_setup' },
+  { href: '/broadcasts', label: 'Broadcasts', icon: Megaphone, capability: 'broadcasts' },
+  { href: '/finance', label: 'Finance', icon: Wallet, capability: 'finance_view' },
+  { href: '/audit', label: 'Audit log', icon: ScrollText, capability: 'audit_view' },
+  { href: '/settings', label: 'Settings', icon: SettingsIcon, capability: 'settings' },
 ]
 
 function visible(item: NavItem, role: AdminRole): boolean {
   return !item.capability || can(role, item.capability)
 }
 
-function ThemeToggle() {
-  function toggle() {
-    const dark = document.documentElement.classList.toggle('dark')
-    try {
-      localStorage.setItem('billdost-admin-theme', dark ? 'dark' : 'light')
-    } catch {
-      // Private mode: the toggle still works for this session.
-    }
-  }
-  return (
-    <button
-      onClick={toggle}
-      className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-      aria-label="Toggle dark mode"
-    >
-      <Sun className="w-5 h-5 hidden dark:block" />
-      <Moon className="w-5 h-5 dark:hidden" />
-    </button>
-  )
-}
-
 /**
- * The portal shell (plan Section 7): slim grouped sidebar on desktop,
- * bottom-safe navigation on phones, top bar with the quick finder and
- * nothing else competing. The shell mounts once and never remounts;
- * only the content area changes between screens.
+ * The portal shell (Dock + Canvas, Nov 22): a frosted header with the
+ * text wordmark, the page as a calm canvas, and a floating frosted
+ * dock as the only navigation. The avatar opens the profile menu:
+ * identity, My profile, the manual theme option, Settings, Sign out.
+ * The shell mounts once and never remounts; only the content area
+ * changes between screens. A throttled heartbeat keeps presence
+ * honest for the Team screen.
  */
 export default function Shell({
   admin,
   children,
 }: {
-  admin: { displayName: string; email: string; role: AdminRole }
+  admin: { displayName: string; email: string; role: AdminRole; uiTheme: UiTheme }
   children: React.ReactNode
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // The stored per-user theme wins on first paint after login; the
+  // localStorage mirror (applied by the root script) is only a cache.
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('billdost-admin-theme')) {
+        applyTheme(admin.uiTheme)
+      }
+    } catch {
+      applyTheme(admin.uiTheme)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Presence heartbeat: on mount, every two minutes, and whenever
+  // the tab becomes visible again. The server throttles the write.
+  useEffect(() => {
+    let stopped = false
+    const ping = () => {
+      if (!stopped) fetch('/api/me/heartbeat', { method: 'POST' }).catch(() => {})
+    }
+    ping()
+    const t = setInterval(ping, 2 * 60 * 1000)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') ping()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      stopped = true
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [])
+
+  // Close overlays when the route changes (state adjusted during
+  // render, the React-endorsed pattern for reacting to a prop-like
+  // value without an effect).
+  const [lastPath, setLastPath] = useState(pathname)
+  if (pathname !== lastPath) {
+    setLastPath(pathname)
+    setMenuOpen(false)
+    setMoreOpen(false)
+  }
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onDoc(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
 
   async function signOut() {
     const supabase = createClient()
@@ -118,131 +147,157 @@ export default function Shell({
     return pathname === href || pathname.startsWith(href + '/')
   }
 
-  const moreItems = GROUPS.flatMap((g) => g.items).filter(
-    (i) => visible(i, admin.role) && !MOBILE_MAIN.some((m) => m.href === i.href)
-  )
+  const dockItems = DOCK.filter((i) => visible(i, admin.role))
+  const moreItems = MORE.filter((i) => visible(i, admin.role))
 
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar, desktop */}
-      <aside className="hidden lg:flex flex-col w-[232px] shrink-0 sticky top-0 h-screen border-r border-black/[0.06] dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.02] backdrop-blur-xl px-3 py-5">
-        <Link href="/dashboard" className="px-3 pb-5 font-extrabold text-[20px] tracking-tight">
-          <span>Bill</span>
-          <span className="text-[#1B7A4A] dark:text-[#25D366]">Dost</span>
-          <span className="block text-[11px] font-bold uppercase tracking-widest text-[#5A5A5E] dark:text-[#A1A1A6] mt-0.5">
-            Admin
-          </span>
-        </Link>
-        <nav className="flex-1 overflow-y-auto space-y-5">
-          {GROUPS.map((group) => {
-            const items = group.items.filter((i) => visible(i, admin.role))
-            if (items.length === 0) return null
-            return (
-              <div key={group.label}>
-                <p className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#86868B]">
-                  {group.label}
-                </p>
-                {items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] font-semibold transition-colors duration-200 ${
-                      isActive(item.href)
-                        ? 'bg-[#1B7A4A]/10 text-[#14663C] dark:bg-[#25D366]/15 dark:text-[#25D366]'
-                        : 'text-[#3A3A3C] dark:text-[#D1D1D6] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <item.icon className="w-[18px] h-[18px]" />
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            )
-          })}
-        </nav>
-        <div className="border-t border-black/[0.06] dark:border-white/[0.08] pt-4 px-3">
-          <p className="text-[14px] font-bold truncate">{admin.displayName}</p>
-          <p className="text-[12px] font-medium text-[#5A5A5E] dark:text-[#A1A1A6] truncate">
-            {ROLE_LABELS[admin.role]} · {admin.email}
-          </p>
-          <button
-            onClick={signOut}
-            className="mt-3 flex items-center gap-2 text-[13px] font-semibold text-[#5A5A5E] dark:text-[#A1A1A6] hover:text-[#1D1D1F] dark:hover:text-white transition-colors"
+    <div className="min-h-screen">
+      {/* Frosted header */}
+      <header className="sticky top-0 z-40 bg-[#F5F5F7]/80 dark:bg-black/70 backdrop-blur-[16px] border-b border-black/[0.05] dark:border-white/[0.07]">
+        <div className="max-w-[1120px] mx-auto flex items-center gap-2 px-4 md:px-6 h-[60px]">
+          <Link
+            href="/dashboard"
+            className="flex items-baseline gap-2 font-extrabold text-[20px] tracking-[-0.02em]"
+            aria-label="BillDost Admin, go to Today"
           >
-            <LogOut className="w-4 h-4" /> Sign out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main column */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-40 flex items-center gap-2 px-4 md:px-8 py-3 bg-[#F5F5F7]/80 dark:bg-black/70 backdrop-blur-xl border-b border-black/[0.05] dark:border-white/[0.07]">
-          <Link href="/dashboard" className="lg:hidden font-extrabold text-[18px] tracking-tight mr-1">
-            <span>Bill</span>
-            <span className="text-[#1B7A4A] dark:text-[#25D366]">Dost</span>
+            BillDost
+            <span className="text-[12px] font-bold uppercase tracking-widest text-[#86868B]">
+              Admin
+            </span>
           </Link>
           <div className="flex-1" />
           <QuickFinder />
-          <ThemeToggle />
-          <div
-            className="hidden sm:flex w-9 h-9 rounded-full bg-[#1B7A4A] text-white items-center justify-center text-[13px] font-bold"
-            title={`${admin.displayName} (${ROLE_LABELS[admin.role]})`}
-          >
-            {admin.displayName.slice(0, 1).toUpperCase()}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="rounded-full active:scale-[0.95] transition-transform duration-150"
+              aria-label="Open profile menu"
+              aria-expanded={menuOpen}
+            >
+              <Avatar name={admin.displayName} size={36} />
+            </button>
+            {menuOpen ? (
+              <div className="pop-in-tr absolute right-0 top-[calc(100%+10px)] w-[300px] bg-white dark:bg-[#2C2C2E] rounded-[20px] shadow-2xl shadow-black/10 border border-black/[0.06] dark:border-white/10 p-2 z-50">
+                <div className="flex items-center gap-3 px-3 py-3">
+                  <Avatar name={admin.displayName} size={44} />
+                  <div className="min-w-0">
+                    <p className="font-bold text-[15px] truncate">{admin.displayName}</p>
+                    <p className="text-[13px] font-medium text-[#5A5A5E] dark:text-[#A1A1A6] truncate">
+                      {admin.email}
+                    </p>
+                    <p className="text-[12px] font-bold text-[#14663C] dark:text-[#25D366]">
+                      {ROLE_LABELS[admin.role]}
+                    </p>
+                  </div>
+                </div>
+                <div className="h-px bg-black/[0.05] dark:bg-white/[0.08] mx-2" />
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-[14px] font-semibold hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+                >
+                  <UserRound className="w-[18px] h-[18px]" /> My profile
+                </Link>
+                <div className="px-3 py-2.5">
+                  <p className="text-[12px] font-bold uppercase tracking-wide text-[#86868B] mb-2">
+                    Theme
+                  </p>
+                  <ThemeControl initialTheme={admin.uiTheme} compact />
+                </div>
+                {can(admin.role, 'settings') ? (
+                  <Link
+                    href="/settings"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-[14px] font-semibold hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+                  >
+                    <SettingsIcon className="w-[18px] h-[18px]" /> Settings
+                  </Link>
+                ) : null}
+                <div className="h-px bg-black/[0.05] dark:bg-white/[0.08] mx-2" />
+                <button
+                  onClick={signOut}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-[14px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-left"
+                >
+                  <LogOut className="w-[18px] h-[18px]" /> Sign out
+                </button>
+              </div>
+            ) : null}
           </div>
-          <button
-            onClick={signOut}
-            className="lg:hidden p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
-            aria-label="Sign out"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </header>
+        </div>
+      </header>
 
-        <main className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8 pb-24 lg:pb-10">
-          <div className="page-enter" key={pathname}>
-            {children}
-          </div>
-        </main>
-      </div>
+      {/* Canvas */}
+      <main className="w-full max-w-[1120px] mx-auto px-4 md:px-6 pt-6 md:pt-8 pb-[150px] md:pb-[168px]">
+        <div className="page-enter" key={pathname}>
+          {children}
+        </div>
+      </main>
 
-      {/* Bottom navigation, phones */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.08] pb-[env(safe-area-inset-bottom)]">
-        <div className="flex">
-          {MOBILE_MAIN.filter((i) => visible(i, admin.role)).map((item) => (
+      {/* Floating dock */}
+      <nav
+        className="dock-in fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white/75 dark:bg-[#2C2C2E]/80 backdrop-blur-[18px] border border-black/[0.06] dark:border-white/10 shadow-xl shadow-black/[0.08] rounded-full p-1.5 flex items-center gap-1 max-w-[calc(100vw-16px)]"
+        aria-label="Portal"
+      >
+        {dockItems.map((item) => {
+          const active = isActive(item.href)
+          return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold min-h-[52px] justify-center ${
-                isActive(item.href)
-                  ? 'text-[#1B7A4A] dark:text-[#25D366]'
-                  : 'text-[#5A5A5E] dark:text-[#A1A1A6]'
+              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-[11px] sm:text-[13px] font-bold transition-all duration-200 active:scale-[0.95] ${
+                active
+                  ? 'bg-[#1B7A4A] text-white dark:bg-[#25D366] dark:text-black shadow-sm'
+                  : 'text-[#3A3A3C] dark:text-[#D1D1D6] hover:bg-black/[0.05] dark:hover:bg-white/[0.08]'
               }`}
             >
-              <item.icon className="w-5 h-5" />
+              <item.icon className="w-5 h-5 sm:w-[18px] sm:h-[18px]" />
               {item.label}
             </Link>
-          ))}
-          <details className="flex-1 group relative">
-            <summary className="flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold min-h-[52px] justify-center text-[#5A5A5E] dark:text-[#A1A1A6] cursor-pointer list-none">
-              <MoreHorizontal className="w-5 h-5" />
-              More
-            </summary>
-            <div className="absolute bottom-full right-2 mb-2 w-52 bg-white dark:bg-[#2C2C2E] rounded-2xl shadow-2xl border border-black/[0.06] dark:border-white/10 p-2 pop-in">
+          )
+        })}
+        {moreItems.length > 0 ? (
+          <button
+            onClick={() => setMoreOpen(true)}
+            className="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-[11px] sm:text-[13px] font-bold text-[#3A3A3C] dark:text-[#D1D1D6] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-all duration-200 active:scale-[0.95]"
+          >
+            <LayoutGrid className="w-5 h-5 sm:w-[18px] sm:h-[18px]" />
+            More
+          </button>
+        ) : null}
+      </nav>
+
+      {/* More sheet */}
+      {moreOpen ? (
+        <div
+          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] fade-in flex items-end sm:items-center justify-center p-4"
+          onClick={() => setMoreOpen(false)}
+        >
+          <div
+            className="sheet-up w-full max-w-md bg-white dark:bg-[#1C1C1E] rounded-[24px] shadow-2xl p-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="px-3 pt-2 pb-3 text-[13px] font-bold uppercase tracking-widest text-[#86868B]">
+              More of the portal
+            </p>
+            <div className="grid grid-cols-2 gap-2">
               {moreItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                  className="flex items-center gap-3 px-4 py-3.5 rounded-[16px] bg-black/[0.03] dark:bg-white/[0.05] text-[14px] font-bold hover:bg-black/[0.05] dark:hover:bg-white/[0.08] active:scale-[0.98] transition-all"
                 >
-                  <item.icon className="w-[18px] h-[18px]" />
+                  <item.icon className="w-5 h-5 text-[#14663C] dark:text-[#25D366]" />
                   {item.label}
                 </Link>
               ))}
             </div>
-          </details>
+            <button
+              onClick={() => setMoreOpen(false)}
+              className="w-full mt-3 py-3 rounded-full text-[14px] font-bold bg-black/[0.04] dark:bg-white/[0.07]"
+            >
+              Close
+            </button>
+          </div>
         </div>
-      </nav>
+      ) : null}
     </div>
   )
 }

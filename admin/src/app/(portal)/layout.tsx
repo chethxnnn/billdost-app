@@ -33,6 +33,7 @@ export default async function PortalLayout({
         displayName: admin.displayName,
         email: admin.email,
         role: admin.role,
+        uiTheme: admin.uiTheme,
       }}
     >
       {children}

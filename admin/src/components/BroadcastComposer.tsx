@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trash2 } from 'lucide-react'
-import { btnPrimary, Card, inputCls, labelCls } from '@/components/ui'
+import { Megaphone, MessageCircle, Trash2 } from 'lucide-react'
+import { btnPrimary, Card, inputCls, labelCls, Tile } from '@/components/ui'
 import { formatDateTime } from '@/lib/format'
 
 export interface AnnouncementRow {
@@ -276,6 +276,9 @@ export default function BroadcastComposer({
             <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.07]">
               {announcements.map((a) => (
                 <li key={a.id} className="py-3 flex gap-3">
+                  <Tile tone="purple">
+                    <Megaphone className="w-5 h-5" />
+                  </Tile>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-[14px]">{a.title}</p>
                     <p className="text-[13px] font-medium text-[#5A5A5E] dark:text-[#A1A1A6] leading-relaxed">{a.body}</p>
@@ -302,13 +305,22 @@ export default function BroadcastComposer({
           ) : (
             <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.07]">
               {log.map((l) => (
-                <li key={l.id} className="py-3">
-                  <p className="font-bold text-[14px]">
-                    {l.template_name} · {l.status.replace('_', ' ')}
-                  </p>
-                  <p className="text-[12px] text-[#86868B] font-medium mt-0.5">
-                    {l.audience} · {l.sent_count} sent, {l.failed_count} failed of {l.recipient_count} · {formatDateTime(l.created_at)}
-                  </p>
+                <li key={l.id} className="py-3 flex gap-3">
+                  <Tile tone="green">
+                    <MessageCircle className="w-5 h-5" />
+                  </Tile>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[14px]">
+                      {l.template_name} · {l.status.replace('_', ' ')}
+                    </p>
+                    <p className="text-[12px] text-[#86868B] font-medium mt-0.5">
+                      {l.audience} · {l.sent_count} sent, {l.failed_count} failed of {l.recipient_count} · {formatDateTime(l.created_at)}
+                    </p>
+                  </div>
+                  <span className="text-right shrink-0">
+                    <span className="block text-[15px] font-extrabold tabular-nums">{l.sent_count}</span>
+                    <span className="block text-[12px] font-medium text-[#86868B]">sent</span>
+                  </span>
                 </li>
               ))}
             </ul>

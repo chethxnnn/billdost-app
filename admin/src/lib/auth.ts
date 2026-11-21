@@ -8,6 +8,7 @@ export interface AdminProfile {
   displayName: string
   email: string
   role: AdminRole
+  uiTheme: 'light' | 'dark'
 }
 
 /**
@@ -26,7 +27,7 @@ export async function getCurrentAdmin(): Promise<AdminProfile | null> {
   const admin = createAdminClient()
   const { data } = await admin
     .from('admin_users')
-    .select('id, auth_user_id, display_name, email, role, status')
+    .select('id, auth_user_id, display_name, email, role, status, ui_theme')
     .eq('auth_user_id', user.id)
     .single()
 
@@ -38,6 +39,7 @@ export async function getCurrentAdmin(): Promise<AdminProfile | null> {
     displayName: data.display_name as string,
     email: data.email as string,
     role: data.role as AdminRole,
+    uiTheme: data.ui_theme === 'dark' ? 'dark' : 'light',
   }
 }
 

@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation'
 import { getCurrentAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { can } from '@/lib/roles'
-import { Card, PageHeader, Pill, StatCard } from '@/components/ui'
+import { Card, PageHeader, Pill, StatCard, Tile } from '@/components/ui'
+import { Wallet } from 'lucide-react'
 import FinanceTable, { type FinanceShop } from '@/components/FinanceTable'
 import { formatCount, formatDate, formatINR } from '@/lib/format'
 
@@ -90,12 +91,19 @@ export default async function FinancePage() {
           <h2 className="text-[16px] font-bold mb-3">Due and overdue</h2>
           <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.07]">
             {dueSoon.map((s) => (
-              <li key={s.id} className="py-2.5 flex flex-wrap items-center gap-3">
-                <span className="flex-1 min-w-[160px] font-semibold text-[14px]">{s.name}</span>
-                <span className="text-[14px] font-bold tabular-nums">{formatINR(s.amount)}</span>
+              <li key={s.id} className="py-3 flex items-center gap-3">
+                <Tile tone={s.status === 'overdue' ? 'pink' : 'amber'}>
+                  <Wallet className="w-5 h-5" />
+                </Tile>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-semibold text-[14px] truncate">{s.name}</span>
+                  <span className="block text-[12px] font-medium text-[#86868B]">
+                    {s.nextDue ? `Due ${formatDate(s.nextDue)}` : 'No due date'}
+                  </span>
+                </span>
                 <Pill tone={s.status === 'overdue' ? 'red' : 'amber'}>{s.status}</Pill>
-                <span className="text-[13px] font-medium text-[#5A5A5E] dark:text-[#A1A1A6]">
-                  {s.nextDue ? formatDate(s.nextDue) : ''}
+                <span className="w-[110px] text-right text-[15px] font-extrabold tabular-nums">
+                  {formatINR(s.amount)}
                 </span>
               </li>
             ))}

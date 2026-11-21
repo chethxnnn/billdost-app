@@ -82,8 +82,8 @@ export default function FinanceTable({ shops }: { shops: FinanceShop[] }) {
               <Link href={`/shops/${s.id}`} className="flex-1 min-w-[160px] font-bold text-[14px] hover:underline underline-offset-4">
                 {s.name}
               </Link>
-              <span className="text-[13px] font-semibold capitalize">{s.plan}</span>
-              <span className="text-[14px] font-bold tabular-nums">{formatINR(s.amount)}</span>
+              <span className="text-[13px] font-semibold capitalize w-20">{s.plan}</span>
+              <span className="text-[14px] font-bold tabular-nums w-[110px] text-right">{formatINR(s.amount)}</span>
               <Pill tone={STATUS_TONE[s.status] ?? 'neutral'}>{s.status}</Pill>
               <span className="text-[13px] font-medium text-[#5A5A5E] dark:text-[#A1A1A6] w-28 text-right">
                 {s.nextDue ? `Due ${formatDate(s.nextDue)}` : 'No due date'}

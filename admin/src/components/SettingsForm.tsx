@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { btnPrimary, Card, inputCls, Pill } from '@/components/ui'
+import ThemeControl, { type UiTheme } from '@/components/ThemeControl'
 
 /**
  * Platform settings (plan Section 6I): the two values the portal
@@ -11,6 +12,7 @@ import { btnPrimary, Card, inputCls, Pill } from '@/components/ui'
  * read-only with its true state.
  */
 export default function SettingsForm({
+  uiTheme,
   supportPhone,
   landingUrl,
   waConnected,
@@ -19,6 +21,7 @@ export default function SettingsForm({
   broadcastTemplate,
   templateLanguage,
 }: {
+  uiTheme: UiTheme
   supportPhone: string
   landingUrl: string
   waConnected: boolean
@@ -53,6 +56,15 @@ export default function SettingsForm({
 
   return (
     <div className="space-y-4">
+      <Card className="p-5 md:p-6">
+        <h2 className="text-[16px] font-bold mb-1.5">Appearance</h2>
+        <p className="text-[13px] text-[#5A5A5E] dark:text-[#A1A1A6] font-medium mb-4 leading-relaxed">
+          Your personal theme. Manual only: light by default, dark
+          when you choose it. It follows your account, not your device.
+        </p>
+        <ThemeControl initialTheme={uiTheme} />
+      </Card>
+
       <Card className="p-5 md:p-6">
         <h2 className="text-[16px] font-bold mb-1.5">Support phone</h2>
         <p className="text-[13px] text-[#5A5A5E] dark:text-[#A1A1A6] font-medium mb-4 leading-relaxed">

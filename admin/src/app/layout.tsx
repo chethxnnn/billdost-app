@@ -6,10 +6,16 @@ export const metadata: Metadata = {
   description: 'The BillDost control centre: shops, requests, activation, issues and broadcasts.',
 }
 
+/*
+  Theme is a manual choice, never automatic (founder decision,
+  Nov 22): light is the default, dark applies only when this admin
+  picked it. The pick is stored per admin user (admin_users.ui_theme)
+  and mirrored to localStorage so it applies before first paint.
+*/
 const themeScript = `
 try {
   var t = localStorage.getItem('billdost-admin-theme');
-  if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  if (t === 'dark') {
     document.documentElement.classList.add('dark');
   }
 } catch (e) {}

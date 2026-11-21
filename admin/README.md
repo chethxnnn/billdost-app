@@ -1,11 +1,18 @@
 # BillDost Admin Portal
 
-The control centre for BillDost: applications inbox, shop setup and
-activation, shop health, the issue centre, broadcasts, finance lite,
-team roles and the audit log. It is a separate Next.js app from the
-shop app (which lives in `../billdost/`). The two apps share exactly
-one thing at runtime: the same Supabase project. Nothing else is
-shared, and nothing in this folder imports from the shop app folder.
+The control centre for BillDost: the Today queue, the applications
+pipeline, shop setup and activation, shop health, the issue centre,
+broadcasts, finance lite, the team workspace and the audit log. It
+is a separate Next.js app from the shop app (which lives in
+`../billdost/`). The two apps share exactly one thing at runtime:
+the same Supabase project. Nothing else is shared, and nothing in
+this folder imports from the shop app folder.
+
+The shell is Dock + Canvas: a frosted header with the text wordmark,
+the screen as a calm canvas, and a floating dock as the only
+navigation. Every screen uses one card system (fixed leading tile
+or avatar column, shared baselines, trailing values right-aligned
+in tabular numbers, 20px radius).
 
 Access model in one paragraph: a person enters the portal only when
 their Supabase Auth user has a row in `admin_users` with status
@@ -30,7 +37,7 @@ npm run dev        # http://localhost:3000 (use another port if the shop app is 
 Checks:
 
 ```bash
-npm run test        # vitest: token hashing/expiry, role matrix
+npm run test        # vitest: tokens, role matrix, attention engine, team stats
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
 npm run build       # production build
@@ -76,10 +83,80 @@ values ('<the-auth-user-uuid>', 'Founder Name', 'founder@example.com', 'founder'
    is added later from the Team screen, which creates their login
    and their role in one step.
 
+## Theme
+
+Light is the default and there is no automatic theme, ever: dark
+applies only when an admin picks it. The option lives in the
+profile menu (avatar, top right), in My profile, and in Settings.
+The choice is stored per admin user in `admin_users.ui_theme` and
+mirrored to localStorage (`billdost-admin-theme`) so it applies
+before first paint and follows the account across devices.
+
+## The founder approval gate
+
+Teammates may help with onboarding (work applications, log calls,
+prepare the full shop setup), but the review and the decision stay
+with the founder. This is enforced in the database and the API,
+never just by hiding buttons:
+
+- A shop created by support lands in the new status
+  `awaiting_approval`. A shop created by the founder or a
+  co-founder is approved inline (the approval is audit-logged) and
+  lands in `pending_activation`.
+- The founder approves (`awaiting_approval` to
+  `pending_activation`) or sends the setup back
+  (`awaiting_approval` to `setup_returned`) with a note the
+  preparer sees, from the approval card on the shop page. The
+  preparer fixes and marks it ready again. Both actions need the
+  `activation_approve` capability (founder and co-founder only)
+  and are audit-logged.
+- Activation links need the `activation_actions` capability
+  (founder and co-founder only; support lost it in the gate). The
+  issue route and `admin_issue_activation_tx` both refuse any shop
+  whose status is not `pending_activation`, so an unapproved shop
+  can never receive a token.
+- Shops awaiting approval surface on the founder's Today queue as
+  their own attention item.
+
+## Team tracking, presence and the Today queue
+
+- Assignments: applications (`access_requests.assignee_id`), shops
+  (`shops.support_owner_id`) and issue groups
+  (`client_errors.assignee_id`) can be assigned or claimed from the
+  Pipeline, the detail pages and the Issue Centre. Every change
+  writes the audit log. A Start action stamps `started_at`; the
+  stamp clears when the status advances. The Team screen reads the
+  latest started item per member as "doing now".
+- Call logs: one tap on an application or shop page records the
+  outcome (answered, no answer, busy, callback requested, not
+  interested, converted, other) plus an optional note into
+  `call_logs`, and into the audit log. Team stats and the activity
+  timeline are computed from these two logs only.
+- Presence: the shell sends a heartbeat at most every two minutes
+  (`POST /api/me/heartbeat`, throttled again server-side), and every
+  audited action refreshes `admin_users.last_active_at`. The Team
+  screen shows "Active now" under five minutes, else "Active Xh
+  ago".
+- The Today queue is computed by `src/lib/attention.ts` from real
+  rows: unassigned applications in new over 2 hours; called with no
+  follow-up in 24 hours; unused activation tokens expiring within
+  12 hours; shops pending activation over 24 hours; open issues
+  unassigned or untouched for 48 hours; live shops with no invoice
+  in 7 days; shops with an overdue plan; and, for founders, shops
+  awaiting approval. Items are ranked by an urgency score and the
+  top ones render with their primary action inline.
+- Team RBAC: everyone can open the Team screen (`team_view`):
+  directory, presence, assignment loads, the timeline. Founders and
+  co-founders see everyone's today counts; other roles see only
+  their own counts. Adding, disabling and re-roling people stays
+  behind `team_manage`.
+
 ## How it connects to the shop app
 
 - Same Supabase project, same database. The portal's tables and RPCs
-  are migrations `0017` to `0021` in `../billdost/supabase/migrations/`.
+  are migrations `0017` to `0022` in `../billdost/supabase/migrations/`.
+  Migration `0022` adds the approval gate, assignments, call logs,
+  presence and the per-user theme.
 - Shop setup calls the `admin_create_shop_tx` RPC; activation issue
   and consume run through `admin_issue_activation_tx`,
   `activation_lookup` and `activation_consume_tx`. The consume step
