@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { X, Plus, Minus, Equal, CheckCircle2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
+import { Modal } from '@/components/ui/Modal'
 
 interface Props {
   product: any
@@ -59,11 +60,12 @@ export function StockAdjustModal({ product, onClose, onSuccess }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div 
-        className="bg-white dark:bg-[#1C1C1E] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabel="Adjust Stock"
+      panelClassName="max-w-[min(92vw,28rem)] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl overflow-hidden"
+    >
         <div className="flex items-center justify-between p-6 border-b border-black/5 dark:border-white/5 bg-gray-50/50 dark:bg-[#1C1C1E]/50">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Adjust Stock</h2>
@@ -181,7 +183,6 @@ export function StockAdjustModal({ product, onClose, onSuccess }: Props) {
             )}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

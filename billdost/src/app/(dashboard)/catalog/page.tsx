@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import MagicExtractModal from '@/components/dashboard/MagicExtractModal'
 import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
+import { Modal, Drawer } from '@/components/ui/Modal'
 import { ScanLine } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -202,7 +203,6 @@ function ProductDrawer({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [barcodeWarning, setBarcodeWarning] = useState('')
   const [drawerScannerOpen, setDrawerScannerOpen] = useState(false)
-  const drawerRef = useRef<HTMLDivElement>(null)
   const utils = trpc.useUtils()
 
   const createMut = trpc.products.create.useMutation({ onSuccess: () => { onSaved(); onClose() } })
@@ -253,12 +253,7 @@ function ProductDrawer({
     }
   }
 
-  // Close on backdrop click
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    if (open) window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [open, onClose])
+  // Escape to close is handled by the shared Drawer (closeOnEscape).
 
   const set = (k: keyof typeof form, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -300,18 +295,13 @@ function ProductDrawer({
   const saveError = createMut.error?.message || updateMut.error?.message
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={onClose}
-      />
-
-      {/* Drawer */}
-      <div
-        ref={drawerRef}
-        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-[#1C1C1E] border-l border-gray-100 dark:border-[#38383A] z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
-      >
+    <Drawer
+      open={open}
+      onClose={onClose}
+      closeOnEscape
+      ariaLabel={product ? t('catalog', 'edit_product') : t('catalog', 'add_product')}
+      panelClassName="max-w-md bg-white dark:bg-[#1C1C1E] flex flex-col"
+    >
         {/* Drawer header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-[#38383A] flex-shrink-0">
           <div>
@@ -553,8 +543,7 @@ function ProductDrawer({
             ) : product ? t('catalog', 'update') : t('catalog', 'add')}
           </button>
         </div>
-      </div>
-    </>
+    </Drawer>
   )
 }
 
@@ -574,11 +563,13 @@ function DeleteModal({
   deleting: boolean
   t: any
 }) {
-  if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+    <Modal
+      open={open}
+      onClose={onCancel}
+      ariaLabel={t('catalog', 'delete_confirm_title')}
+      panelClassName="max-w-[min(92vw,24rem)] bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-6 shadow-2xl"
+    >
         <div className="text-3xl mb-3">🗑️</div>
         <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">
           {t('catalog', 'delete_confirm_title')}
@@ -602,8 +593,7 @@ function DeleteModal({
             {t('catalog', 'yes_delete')}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

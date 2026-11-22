@@ -12,6 +12,7 @@ import { QuotationPreview, QuotationPreviewRef, QuotationPreviewData } from '@/c
 import { computeTotals, stateCodeFromGstin } from '@/lib/money'
 import { stateCodeForName } from '@/lib/indian-states'
 import { normalizePhone } from '@/lib/phone'
+import { Modal } from '@/components/ui/Modal'
 
 export default function NewQuotationPage() {
   const router = useRouter()
@@ -152,7 +153,9 @@ export default function NewQuotationPage() {
     <div className="h-full flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto">
       
       {/* --- Left Side: Form --- */}
-      <div className="flex-1 overflow-y-auto pr-2 pb-24 lg:pb-0">
+      {/* No internal scroller (fix round 2): the window is the
+          shell's only scroller, same as invoices/new. */}
+      <div className="flex-1 min-w-0 pr-2 pb-24 lg:pb-0">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
@@ -227,26 +230,32 @@ export default function NewQuotationPage() {
         </div>
       </div>
 
-      {/* --- Mobile Preview Modal --- */}
-      {mobilePreviewOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm lg:hidden flex flex-col">
+      {/* --- Mobile Preview Modal: shared fullscreen Modal (portal
+          at body level), so no page ancestor can offset it. --- */}
+      <Modal
+        open={mobilePreviewOpen}
+        onClose={() => setMobilePreviewOpen(false)}
+        variant="fullscreen"
+        ariaLabel="Live Preview"
+      >
+        <div className="flex flex-1 flex-col min-h-0 bg-black/80 backdrop-blur-sm lg:hidden">
           <div className="flex justify-between items-center p-4 bg-white dark:bg-[#1C1C1E]">
             <h2 className="font-bold text-gray-900 dark:text-white">Live Preview</h2>
             <button onClick={() => setMobilePreviewOpen(false)} className="text-gray-500 font-bold p-2">✕ Close</button>
           </div>
-          <div className="flex-1 overflow-auto p-4 flex justify-center">
+          <div className="flex-1 min-h-0 overflow-auto p-4 flex justify-center">
             <div className="w-full max-w-[794px]">
               <QuotationPreview ref={previewRef} data={previewData} shop={shopData} />
             </div>
           </div>
           <div className="p-4 bg-white dark:bg-[#1C1C1E] border-t border-gray-200 dark:border-[#38383A] flex gap-3">
-             <button 
+             <button
                 onClick={handleWhatsApp}
                 className="flex-1 py-3 bg-[#25D366]/10 text-[#25D366] font-bold rounded-xl"
               >
                 Send via WhatsApp
               </button>
-             <button 
+             <button
                 onClick={handleDownload}
                 className="flex-1 py-3 bg-gray-100 dark:bg-[#2C2C2E] text-gray-900 dark:text-white font-bold rounded-xl"
               >
@@ -254,7 +263,7 @@ export default function NewQuotationPage() {
               </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   )
 }

@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useTranslation } from '@/lib/i18n/useTranslation'
-import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher'
 import { useLogout } from '@/lib/use-logout'
 import { Globe, LogOut } from 'lucide-react'
 
@@ -79,10 +78,9 @@ interface NavGroup {
   items: NavItem[]
 }
 
-// Grouped navigation (Stage 5). The groups are sized so the whole
-// rail fits a laptop viewport: compact 36px rows, tighter still on
-// short screens, and NO internal scrollbar anywhere in the sidebar.
-// The page scrolls; the sidebar never does.
+// Grouped navigation. Same destinations and role filtering as
+// before; only the rail's structure and surface changed (see the
+// height budget note on the component below).
 const getNavGroups = (t: any): NavGroup[] => [
   {
     key: 'main',
@@ -122,8 +120,38 @@ const getNavGroups = (t: any): NavGroup[] => [
 const CASHIER_HIDDEN = ['/analytics', '/reports/gst', '/expenses', '/low-stock']
 
 const rowClass =
-  'relative flex items-center gap-3 px-3 h-9 [@media(max-height:840px)]:h-8 rounded-xl text-[13.5px] transition-colors duration-150 group'
+  'relative flex items-center gap-3 px-3 h-[34px] rounded-[10px] text-[13.5px] transition-colors duration-150 group'
 
+/**
+ * SEAMLESS RAIL (fix round 2, Stage 1).
+ *
+ * Concept: the rail is not a panel. Its background is exactly the
+ * page canvas (gray-50 / pure black), with no divider line, no
+ * shadow and no blur, so the sidebar and the page read as one
+ * surface and the content cards provide all the separation. The
+ * only card-like element in the rail is the bottom user tile.
+ *
+ * Overlap-proof structure: the old rail was a full-height flex
+ * column whose nav was flex-1 min-h-0 with visible overflow, so at laptop
+ * heights the last group painted over the bottom block. This rail
+ * is sticky with height auto inside a shell where the window is
+ * the only scroller; every block takes its natural height in
+ * normal flow, so nothing can ever paint over anything else.
+ *
+ * Height budget, expanded rail, owner role (all 15 rows visible),
+ * must fit an 800px viewport with no scrolling:
+ *   identity row            64
+ *   nav top padding          8
+ *   group labels      3 x 16 = 48
+ *   rows             15 x 34 = 510
+ *   row gaps         12 x  2 = 24
+ *   group gaps        2 x 12 = 24
+ *   nav bottom padding       4
+ *   user tile (52 + margin)  60
+ *   collapse row            32
+ *   bottom padding           8
+ *   total                  ~782  (under 800, cashier sees fewer rows)
+ */
 export default function Sidebar({ collapsed, onToggle, shopName, shopCategory, userName, role }: Props) {
   const pathname = usePathname()
   const { t } = useTranslation()
@@ -147,14 +175,14 @@ export default function Sidebar({ collapsed, onToggle, shopName, shopCategory, u
 
   return (
     <aside
-      className={`hidden lg:flex flex-col bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-2xl border-r border-black/5 dark:border-white/5 h-screen sticky top-0 transition-[width] duration-300 z-40 ${
-        collapsed ? 'w-[72px]' : 'w-[248px]'
+      className={`hidden lg:flex flex-col sticky top-0 self-start shrink-0 bg-gray-50 dark:bg-[#000000] transition-[width] duration-300 ${
+        collapsed ? 'w-[76px]' : 'w-[248px]'
       }`}
     >
-      {/* Shop identity header */}
-      <div className="px-4 h-16 flex items-center gap-3 border-b border-black/5 dark:border-white/5 flex-shrink-0">
-        <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-[#1B7A4A] to-[#25D366] shadow-sm shadow-[#1B7A4A]/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-white text-[15px] font-semibold tracking-tight font-display">
+      {/* Shop identity: a quiet workspace row on the canvas, no chrome */}
+      <div className="px-4 h-16 flex items-center gap-3 shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1B7A4A] to-[#25D366] shadow-sm shadow-[#1B7A4A]/20 flex items-center justify-center shrink-0">
+          <span className="text-white text-[14px] font-semibold tracking-tight font-display">
             {shopName.charAt(0).toUpperCase()}
           </span>
         </div>
@@ -163,7 +191,7 @@ export default function Sidebar({ collapsed, onToggle, shopName, shopCategory, u
             collapsed ? 'opacity-0 pointer-events-none w-0 overflow-hidden' : 'opacity-100 w-auto'
           }`}
         >
-          <div className="font-semibold text-[15px] tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] truncate leading-tight">
+          <div className="font-semibold text-[14.5px] tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] truncate leading-tight">
             {shopName}
           </div>
           <div className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D] truncate leading-tight">
@@ -172,14 +200,14 @@ export default function Sidebar({ collapsed, onToggle, shopName, shopCategory, u
         </div>
       </div>
 
-      {/* Grouped nav: no overflow, no internal scrollbar */}
-      <nav className="flex-1 min-h-0 px-3 py-4 flex flex-col gap-5 [@media(max-height:840px)]:gap-3.5">
+      {/* Grouped nav: natural height, no flex-1 squeeze, no scrollbar */}
+      <nav className="px-3 pt-2 pb-1 flex flex-col gap-3">
         {groups.map((group) => (
           <div key={group.key}>
             {collapsed ? (
-              <div className="mx-2 mb-2 border-t border-black/5 dark:border-white/10 first:border-t-0 first:mb-0" aria-hidden="true" />
+              <div className="h-4" aria-hidden="true" />
             ) : (
-              <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6E6E73] dark:text-[#98989D]">
+              <div className="px-3 pb-1 text-[11px] leading-none font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-[#98989D]">
                 {group.label}
               </div>
             )}
@@ -199,7 +227,7 @@ export default function Sidebar({ collapsed, onToggle, shopName, shopCategory, u
                         collapsed ? 'justify-center px-0' : ''
                       }`}
                     >
-                      <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                      <Icon className="w-[18px] h-[18px] shrink-0" />
                       {!collapsed && <span className="tracking-tight">{item.label}</span>}
                     </Link>
                   )
@@ -215,18 +243,18 @@ export default function Sidebar({ collapsed, onToggle, shopName, shopCategory, u
                     className={`${rowClass} ${
                       isActive
                         ? 'text-[#1B7A4A] dark:text-[#25D366] font-semibold'
-                        : 'text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/5 dark:hover:bg-white/5 font-medium active:scale-[0.99]'
+                        : 'text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] font-medium active:scale-[0.99]'
                     } ${collapsed ? 'justify-center px-0' : ''}`}
                   >
                     {isActive && (
                       <motion.span
                         layoutId="sidebar-active-pill"
-                        className="absolute inset-0 rounded-xl bg-[#1B7A4A]/10 dark:bg-[#25D366]/12"
+                        className="absolute inset-0 rounded-[10px] bg-[#1B7A4A]/10 dark:bg-[#25D366]/12"
                         transition={{ type: 'spring', stiffness: 500, damping: 38, mass: 0.9 }}
                         aria-hidden="true"
                       />
                     )}
-                    <Icon className={`relative w-[18px] h-[18px] flex-shrink-0 transition-transform duration-150 group-hover:scale-105 ${isActive ? 'stroke-[2.5px]' : ''}`} />
+                    <Icon className={`relative w-[18px] h-[18px] shrink-0 transition-transform duration-150 group-hover:scale-105 ${isActive ? 'stroke-[2.5px]' : ''}`} />
                     {!collapsed && (
                       <>
                         <span className="relative flex-1 tracking-tight truncate">{item.label}</span>
@@ -249,75 +277,92 @@ export default function Sidebar({ collapsed, onToggle, shopName, shopCategory, u
         ))}
       </nav>
 
-      {/* Bottom block: language, user card, settings, sign out, collapse */}
-      <div className="px-3 pb-3 pt-2 border-t border-black/5 dark:border-white/5 flex-shrink-0 space-y-1">
-        {!collapsed && (
-          <div className="px-1 pb-1">
-            <LanguageSwitcher />
-          </div>
-        )}
-
-        {/* User card */}
+      {/* User tile: the one card-like element on the rail. Settings
+          and Sign out live here as icon actions; the language
+          switcher moved to the Settings page (it already lives
+          there) so the rail carries no full-width utility rows. */}
+      <div className="px-3 mt-2">
         <div
-          className={`flex items-center gap-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/5 px-2.5 py-2 ${
-            collapsed ? 'justify-center px-0 bg-transparent dark:bg-transparent' : ''
+          className={`rounded-2xl bg-white dark:bg-[#1C1C1E] shadow-sm px-3 py-2.5 flex items-center gap-2.5 ${
+            collapsed ? 'flex-col justify-center px-0 py-3' : ''
           }`}
         >
-          <div className="w-8 h-8 rounded-full bg-[#1B7A4A]/12 dark:bg-[#25D366]/15 flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-[#1B7A4A]/12 dark:bg-[#25D366]/15 flex items-center justify-center shrink-0">
             <span className="text-[#1B7A4A] dark:text-[#25D366] text-[13px] font-bold">
               {(userName || shopName).charAt(0).toUpperCase()}
             </span>
           </div>
           {!collapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-[13px] font-semibold tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] truncate leading-tight">
-                {userName}
-              </span>
-              <span className="text-[11px] font-medium text-[#6E6E73] dark:text-[#98989D] leading-tight">
-                {roleLabel}
-              </span>
-            </div>
+            <>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-[13px] font-semibold tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] truncate leading-tight">
+                  {userName}
+                </span>
+                <span className="text-[11px] font-medium text-[#6E6E73] dark:text-[#98989D] leading-tight">
+                  {roleLabel}
+                </span>
+              </div>
+              {settingsVisible && (
+                <Link
+                  href="/settings"
+                  aria-label={t('sidebar', 'settings')}
+                  title={t('sidebar', 'settings')}
+                  aria-current={settingsActive ? 'page' : undefined}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                    settingsActive
+                      ? 'text-[#1B7A4A] dark:text-[#25D366] bg-[#1B7A4A]/10 dark:bg-[#25D366]/12'
+                      : 'text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'
+                  }`}
+                >
+                  <SettingsIcon className="w-[18px] h-[18px]" />
+                </Link>
+              )}
+              <button
+                onClick={() => void logout()}
+                aria-label="Logout"
+                title="Logout"
+                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[#6E6E73] dark:text-[#98989D] hover:bg-[#FF3B30]/10 dark:hover:bg-[#FF453A]/10 hover:text-[#FF3B30] dark:hover:text-[#FF453A] transition-colors"
+              >
+                <LogOut className="w-[18px] h-[18px]" aria-hidden="true" />
+              </button>
+            </>
+          )}
+          {collapsed && (
+            <>
+              {settingsVisible && (
+                <Link
+                  href="/settings"
+                  aria-label={t('sidebar', 'settings')}
+                  title={t('sidebar', 'settings')}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                >
+                  <SettingsIcon className="w-[18px] h-[18px]" />
+                </Link>
+              )}
+              <button
+                onClick={() => void logout()}
+                aria-label="Logout"
+                title="Logout"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[#6E6E73] dark:text-[#98989D] hover:bg-[#FF3B30]/10 hover:text-[#FF3B30] dark:hover:text-[#FF453A] transition-colors"
+              >
+                <LogOut className="w-[18px] h-[18px]" aria-hidden="true" />
+              </button>
+            </>
           )}
         </div>
+      </div>
 
-        {settingsVisible && (
-          <Link
-            href="/settings"
-            aria-label={t('sidebar', 'settings')}
-            aria-current={settingsActive ? 'page' : undefined}
-            title={collapsed ? t('sidebar', 'settings') : undefined}
-            className={`${rowClass} ${
-              settingsActive
-                ? 'text-[#1B7A4A] dark:text-[#25D366] font-semibold bg-[#1B7A4A]/10 dark:bg-[#25D366]/12'
-                : 'text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] font-medium'
-            } ${collapsed ? 'justify-center px-0' : ''}`}
-          >
-            <SettingsIcon className="w-[18px] h-[18px] flex-shrink-0" />
-            {!collapsed && <span className="tracking-tight">{t('sidebar', 'settings')}</span>}
-          </Link>
-        )}
-
-        <button
-          onClick={() => void logout()}
-          aria-label="Logout"
-          title={collapsed ? 'Logout' : undefined}
-          className={`${rowClass} w-full text-left text-[#FF3B30] dark:text-[#FF453A] hover:bg-[#FF3B30]/10 dark:hover:bg-[#FF453A]/10 font-medium ${
-            collapsed ? 'justify-center px-0' : ''
-          }`}
-        >
-          <LogOut className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
-          {!collapsed && <span className="tracking-tight">Logout</span>}
-        </button>
-
+      {/* Collapse toggle: one quiet row */}
+      <div className="px-3 pb-2 pt-1">
         <button
           onClick={onToggle}
           aria-label={collapsed ? 'Sidebar kholo' : 'Sidebar band karo'}
           title={collapsed ? 'Expand' : 'Collapse'}
-          className={`${rowClass} w-full text-left text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] font-medium ${
+          className={`flex items-center gap-3 px-3 h-8 w-full rounded-[10px] text-[12.5px] text-[#86868B] dark:text-[#98989D] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] font-medium transition-colors ${
             collapsed ? 'justify-center px-0' : ''
           }`}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`flex-shrink-0 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} aria-hidden="true">
             <path d="M11 17l-5-5 5-5" /><path d="M18 17l-5-5 5-5" />
           </svg>
           {!collapsed && <span className="tracking-tight">Collapse</span>}

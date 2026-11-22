@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Modal } from '@/components/ui/Modal'
 
 interface ExtractedProduct {
   name: string
@@ -124,14 +125,18 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
     }
   }
 
-  if (!open) return null
-
+  // Shared Modal (portal at body level): the old inline fixed
+  // overlay sat inside PageTransition's transformed wrapper, which
+  // made it render off-centre, shift the page and widen it. The
+  // portal pattern makes that impossible.
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabel="Magic Extract"
+      panelClassName="max-w-[min(92vw,56rem)] max-h-[90dvh] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+    >
+
         {/* Header */}
         <div className="px-6 py-5 border-b border-black/5 dark:border-white/5 flex items-center justify-between bg-gradient-to-r from-[#1B7A4A]/5 to-[#25D366]/5">
           <div className="flex items-center gap-3">
@@ -337,8 +342,7 @@ export default function MagicExtractModal({ open, onClose, onSaved }: Props) {
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   )
 }
 

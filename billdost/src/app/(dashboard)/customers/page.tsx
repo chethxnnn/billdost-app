@@ -6,6 +6,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import CustomerAnalyticsDrawer from '@/components/customers/CustomerAnalyticsDrawer'
+import { Modal, Drawer } from '@/components/ui/Modal'
 import { useShop } from '@/components/shared/ShopContext'
 import { normalizePhone } from '@/lib/phone'
 import { INDIAN_STATES, stateCodeForName, stateNameForCode } from '@/lib/indian-states'
@@ -206,7 +207,6 @@ function CustomerDrawer({
   const [form, setForm] = useState({ ...DEFAULT_FORM })
   const [tagInput, setTagInput] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const drawerRef = useRef<HTMLDivElement>(null)
 
   const createMut = trpc.customers.create.useMutation({ onSuccess: () => { onSaved(); onClose() } })
   const updateMut = trpc.customers.update.useMutation({ onSuccess: () => { onSaved(); onClose() } })
@@ -231,12 +231,7 @@ function CustomerDrawer({
     setErrors({})
   }, [customer, open])
 
-  // Close on backdrop click
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    if (open) window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [open, onClose])
+  // Escape to close is handled by the shared Drawer (closeOnEscape).
 
   const set = (k: keyof typeof form, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -285,15 +280,13 @@ function CustomerDrawer({
   const saveError = createMut.error?.message || updateMut.error?.message
 
   return (
-    <>
-      <div
-        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={onClose}
-      />
-      <div
-        ref={drawerRef}
-        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-[#1C1C1E] border-l border-gray-100 dark:border-[#38383A] z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
-      >
+    <Drawer
+      open={open}
+      onClose={onClose}
+      closeOnEscape
+      ariaLabel={customer ? t('customers', 'edit_customer') : t('customers', 'add_customer')}
+      panelClassName="max-w-md bg-white dark:bg-[#1C1C1E] flex flex-col"
+    >
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-[#38383A] flex-shrink-0">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
@@ -432,8 +425,7 @@ function CustomerDrawer({
             {customer ? t('customers', 'update') : t('customers', 'add')}
           </button>
         </div>
-      </div>
-    </>
+    </Drawer>
   )
 }
 
@@ -455,11 +447,13 @@ function DeleteModal({
   error?: string | null
   t: any
 }) {
-  if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+    <Modal
+      open={open}
+      onClose={onCancel}
+      ariaLabel={t('customers', 'delete_confirm_title')}
+      panelClassName="max-w-[min(92vw,24rem)] bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-2xl p-6 shadow-2xl"
+    >
         <div className="text-3xl mb-3">🗑️</div>
         <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">
           {t('customers', 'delete_confirm_title')}
@@ -484,8 +478,7 @@ function DeleteModal({
             {t('customers', 'delete')}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
