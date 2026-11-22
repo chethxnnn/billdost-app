@@ -172,6 +172,18 @@ h2 {
   animation: pop-in-tr 240ms var(--spring) both;
 }
 
+/* QuickFinder panel entrance: a calm pop on desktop, a sheet rise
+   on phones where the finder is full-screen. */
+.finder-panel {
+  animation: pop-in 220ms var(--spring) both;
+}
+
+@media (max-width: 639px) {
+  .finder-panel {
+    animation: sheet-up 260ms var(--spring) both;
+  }
+}
+
 /* Bottom sheet (More menu on phones): rises from the dock. */
 @keyframes sheet-up {
   from {
@@ -216,6 +228,7 @@ h2 {
   .pop-in,
   .pop-in-tr,
   .sheet-up,
+  .finder-panel,
   .dock-in {
     animation: none;
   }

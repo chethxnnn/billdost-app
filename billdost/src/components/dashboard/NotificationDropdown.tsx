@@ -36,6 +36,19 @@ export default function NotificationDropdown() {
     { enabled: open, staleTime: 30_000 }
   )
 
+  // Platform announcements (fix round, Stage 2): the badge counts
+  // what this shop has not seen yet; the panel lists the newest few
+  // above the shop's own activity.
+  const { data: unseenCount } = trpc.announcements.unseenCount.useQuery(
+    undefined,
+    { staleTime: 60_000 }
+  )
+  const { data: announcements } = trpc.announcements.list.useQuery(undefined, {
+    enabled: open,
+    staleTime: 30_000,
+  })
+  const topAnnouncements = (announcements ?? []).slice(0, 3)
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -66,6 +79,11 @@ export default function NotificationDropdown() {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
+        {unseenCount && unseenCount > 0 ? (
+          <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#1B7A4A] dark:bg-[#25D366] text-white dark:text-black text-[10.5px] font-extrabold tabular-nums flex items-center justify-center ring-2 ring-white dark:ring-[#1C1C1E]">
+            {unseenCount > 9 ? '9+' : unseenCount}
+          </span>
+        ) : null}
       </button>
 
       {/* Dropdown Panel */}
@@ -84,6 +102,42 @@ export default function NotificationDropdown() {
               Sab dekho →
             </Link>
           </div>
+
+          {/* Announcements from the BillDost team */}
+          {topAnnouncements.length > 0 ? (
+            <div className="border-b border-black/5 dark:border-white/5 py-2">
+              <p className="px-5 pt-1.5 pb-1 text-[11px] font-bold uppercase tracking-[0.06em] text-[#1B7A4A] dark:text-[#25D366]">
+                BillDost ki taraf se
+              </p>
+              {topAnnouncements.map((a) => (
+                <Link
+                  key={a.id}
+                  href="/notifications"
+                  onClick={() => setOpen(false)}
+                  className="flex items-start gap-3 px-5 py-2.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                >
+                  <span
+                    className={`mt-[7px] w-2 h-2 rounded-full shrink-0 ${
+                      a.seen
+                        ? 'bg-black/15 dark:bg-white/15'
+                        : 'bg-[#1B7A4A] dark:bg-[#25D366]'
+                    }`}
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13.5px] font-bold text-[#1D1D1F] dark:text-[#F5F5F7] leading-snug truncate">
+                      {a.title}
+                    </span>
+                    <span className="block text-[12px] font-medium text-gray-500 dark:text-[#98989D] leading-snug line-clamp-1 mt-0.5">
+                      {a.body}
+                    </span>
+                  </span>
+                  <span className="text-[11px] font-medium text-gray-400 dark:text-[#636366] tabular-nums shrink-0 mt-0.5">
+                    {timeAgo(a.created_at)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
 
           {/* Content */}
           <div className="overflow-y-auto max-h-[400px]">

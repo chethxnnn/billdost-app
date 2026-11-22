@@ -2,11 +2,19 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { KanbanSquare, List, Phone, MessageCircle, Play } from 'lucide-react'
-import { Avatar, Card, EmptyState, RequestStatusPill } from '@/components/ui'
+import { KanbanSquare, List, Phone, MessageCircle, Play, ArrowRight } from 'lucide-react'
+import { Avatar, Card, EmptyState, RequestStatusPill, ShopStatusPill } from '@/components/ui'
 import AssignControl, { type MemberOption } from '@/components/AssignControl'
 import { usePersistedView } from '@/lib/use-persisted-view'
 import { telLink, timeAgo, whatsappLink } from '@/lib/format'
+import {
+  directActionLabel,
+  directFilterKey,
+  directStageOf,
+  type DirectShopRow,
+} from '@/lib/pipeline-stages'
+
+export type { DirectShopRow }
 
 export interface RequestRow {
   id: string
@@ -93,12 +101,14 @@ const VIEW_KEY = 'billdost-pipeline-view'
  */
 export default function RequestsBoard({
   requests,
+  directShops = [],
   initialStatus,
   members,
   currentAdminId,
   canAssign,
 }: {
   requests: RequestRow[]
+  directShops?: DirectShopRow[]
   initialStatus?: string
   members: MemberOption[]
   currentAdminId: string
@@ -132,8 +142,114 @@ export default function RequestsBoard({
   })
   const visible = searched.filter((r) => status === 'all' || r.status === status)
 
+  // Direct shops (no request row) honour the same search box, and the
+  // status chips through their stage-equivalent filter key.
+  const searchedDirect = directShops.filter((s) => {
+    if (directStageOf(s.status) === null) return false
+    if (!query) return true
+    const q = query.toLowerCase()
+    return (
+      s.name.toLowerCase().includes(q) ||
+      s.owner_name.toLowerCase().includes(q) ||
+      s.owner_phone.includes(q)
+    )
+  })
+  const visibleDirect = searchedDirect.filter(
+    (s) => status === 'all' || directFilterKey(s.status) === status
+  )
+
   const memberName = (id: string | null) =>
     members.find((m) => m.id === id)?.name ?? null
+
+  const directTag = (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-black/[0.05] dark:bg-white/[0.09] text-[11px] font-bold text-[#5A5A5E] dark:text-[#A1A1A6]">
+      Direct
+    </span>
+  )
+
+  const directCard = (s: DirectShopRow) => (
+    <div
+      key={`direct-${s.id}`}
+      className="bg-white dark:bg-[#1C1C1E] border border-black/[0.06] dark:border-white/[0.08] rounded-[16px] p-3"
+    >
+      <div className="flex items-start gap-2">
+        <Link
+          href={`/shops/${s.id}`}
+          className="font-bold text-[14px] leading-snug hover:underline underline-offset-4 flex-1 min-w-0"
+        >
+          {s.name}
+        </Link>
+        {directTag}
+      </div>
+      <p className="text-[12px] font-medium text-[#5A5A5E] dark:text-[#A1A1A6] mt-0.5 truncate">
+        {s.owner_name || 'Owner not set'} · {s.category}
+        {s.state ? ` · ${s.state}` : ''}
+      </p>
+      <div className="flex items-center gap-2 mt-2.5">
+        {s.status === 'suspended' ? (
+          <span className="text-[12px] font-bold text-red-600 dark:text-red-400">Suspended</span>
+        ) : s.support_owner_id ? (
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-bold min-w-0">
+            <Avatar name={memberName(s.support_owner_id) ?? '?'} size={20} />
+            <span className="truncate">
+              {s.support_owner_id === currentAdminId
+                ? 'You'
+                : (memberName(s.support_owner_id) ?? 'Assigned')}
+            </span>
+          </span>
+        ) : (
+          <span className="text-[12px] font-semibold text-[#86868B]">Set up directly</span>
+        )}
+        <span className="flex-1" />
+        <span className="text-[12px] font-medium text-[#86868B] tabular-nums">
+          {timeAgo(s.created_at)}
+        </span>
+        <Link
+          href={`/shops/${s.id}`}
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-[#1B7A4A] text-white text-[12px] font-bold active:scale-[0.97] transition-transform"
+        >
+          {directActionLabel(s.status)} <ArrowRight className="w-3 h-3" />
+        </Link>
+      </div>
+    </div>
+  )
+
+  const directRow = (s: DirectShopRow) => (
+    <li key={`direct-${s.id}`} className="px-4 md:px-5 py-3.5">
+      <div className="flex items-center gap-3">
+        <Avatar name={s.owner_name || s.name} size={40} />
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/shops/${s.id}`}
+              className="text-[15px] font-bold hover:underline underline-offset-4"
+            >
+              {s.name}
+            </Link>
+            {directTag}
+            <ShopStatusPill status={s.status} />
+          </div>
+          <p className="text-[13px] text-[#5A5A5E] dark:text-[#A1A1A6] font-medium mt-0.5 truncate">
+            {s.owner_name || 'Owner not set'} · {s.category}
+            {s.state ? ` · ${s.state}` : ''}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-[12px] font-medium text-[#86868B] tabular-nums">
+            {timeAgo(s.created_at)}
+          </p>
+          <div className="flex gap-1.5 mt-1.5 justify-end">
+            <Link
+              href={`/shops/${s.id}`}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-[#1B7A4A] text-white text-[12px] font-bold active:scale-[0.97] transition-transform"
+            >
+              {directActionLabel(s.status)} <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </li>
+  )
 
   const viewToggle = (
     <div className="flex gap-1 p-1 rounded-full bg-black/[0.05] dark:bg-white/[0.08] w-fit">
@@ -196,30 +312,34 @@ export default function RequestsBoard({
         />
       </div>
 
-      {requests.length === 0 ? (
+      {requests.length === 0 && directShops.length === 0 ? (
         <EmptyState
           title="No requests yet"
-          body="Share the BillDost link to get your next shop. Requests from the website form will land here."
+          body="Share the BillDost link to get your next shop. Requests from the website form will land here, and shops you set up directly will appear too."
         />
       ) : view === 'board' ? (
         <>
           <div className="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 lg:max-h-[calc(100dvh-20rem)] lg:min-h-[16rem]">
             {STAGES.map((stage) => {
               const cards = searched.filter((r) => stageOf(r) === stage.key)
+              const dcards = searchedDirect.filter(
+                (s) => directStageOf(s.status) === stage.key
+              )
               return (
                 <div key={stage.key} className="w-[248px] shrink-0 flex flex-col min-h-0">
                   <div className="flex items-baseline justify-between px-1 mb-2 shrink-0">
                     <p className="text-[13px] font-extrabold tracking-[-0.01em]">{stage.label}</p>
-                    <span className="text-[12px] font-bold text-[#86868B] tabular-nums">{cards.length}</span>
+                    <span className="text-[12px] font-bold text-[#86868B] tabular-nums">{cards.length + dcards.length}</span>
                   </div>
                   {/* On desktop the column header stays fixed while
                       its cards scroll inside the column, and the
                       column ends at the board's bottom edge. */}
                   <div className="space-y-2 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pb-1">
-                    {cards.length === 0 ? (
+                    {cards.length === 0 && dcards.length === 0 ? (
                       <p className="text-[12px] font-medium text-[#86868B] px-1 py-3">Nothing here.</p>
                     ) : (
-                      cards.map((r) => (
+                      <>
+                      {cards.map((r) => (
                         <div
                           key={r.id}
                           className="bg-white dark:bg-[#1C1C1E] border border-black/[0.06] dark:border-white/[0.08] rounded-[16px] p-3"
@@ -265,7 +385,9 @@ export default function RequestsBoard({
                             </a>
                           </div>
                         </div>
-                      ))
+                      ))}
+                      {dcards.map(directCard)}
+                      </>
                     )}
                   </div>
                 </div>
@@ -276,18 +398,21 @@ export default function RequestsBoard({
             Rejected requests appear in the List view. Open a card for assignment, call logs and actions.
           </p>
         </>
-      ) : visible.length === 0 ? (
+      ) : visible.length === 0 && visibleDirect.length === 0 ? (
         <EmptyState title="Nothing in this view" body="Try another status or clear the search." />
       ) : (
         <div className="space-y-6">
           {STAGES.map((stage) => {
             const rows = visible.filter((r) => stageOf(r) === stage.key)
-            if (rows.length === 0) return null
+            const drows = visibleDirect.filter(
+              (s) => directStageOf(s.status) === stage.key
+            )
+            if (rows.length === 0 && drows.length === 0) return null
             return (
               <section key={stage.key}>
                 <p className="sticky-group-head sticky-group-head-pipeline text-[13px] font-extrabold tracking-[-0.01em] mb-2 px-2 py-1.5 -mx-1 rounded-[8px]">
                   {stage.label}{' '}
-                  <span className="text-[#86868B] tabular-nums">{rows.length}</span>
+                  <span className="text-[#86868B] tabular-nums">{rows.length + drows.length}</span>
                 </p>
                 <Card className="overflow-hidden">
                   <ul className="divide-y divide-black/[0.05] dark:divide-white/[0.07]">
@@ -350,6 +475,7 @@ export default function RequestsBoard({
                         </div>
                       </li>
                     ))}
+                    {drows.map(directRow)}
                   </ul>
                 </Card>
               </section>

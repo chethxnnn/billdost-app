@@ -54,10 +54,9 @@
 
 ### 7. AI Features
 - **Magic Extract:** Upload an image of a physical bill/invoice, and the AI (`gemini-2.0-flash`) will instantly OCR and extract all product details, prices, and quantities directly into the cart.
-- **Smart Chatbot:** An in-app floating chatbot that has secure, direct access to the shop's database.
-  - **Tools:** `getShopStats`, `getInvoices`, `getCustomers`, `getProducts`, `navigateApp`.
-  - **Strict Scoping:** Hardcoded to *only* answer questions regarding the user's shop, inventory, sales, or app navigation. Refuses general knowledge queries.
-  - **Performance:** Upgraded from `gemini-2.5-flash` (which hit a 20/day limit) to `gemini-2.0-flash` to completely bypass free-tier rate limits and ensure lightning-fast responses.
+- **Smart Assistant:** An in-app assistant panel (right side on desktop, full sheet on mobile) with secure, direct access to the shop's database.
+  - **Deterministic first (Nov 22, 2026):** the known daily questions (sales today/yesterday/week/month, top items, low stock, udhaar and top debtors, a named customer's history, payments today, GST this month, bill counts, navigation) are answered by a fixed intent engine (`src/lib/assistant/` + `src/server/assistant/engine.ts`) from fixed queries, composed from templates with exact figures. No model is involved, so these numbers cannot be invented.
+  - **Fallback:** anything the engine does not match falls through to the Gemini tool-calling flow (`gemini-2.0-flash`), unchanged, with tools `getShopStats`, `getInvoices`, `getCustomers`, `getProducts`, `navigateApp`, hardcoded to only answer questions regarding the user's shop, inventory, sales, or app navigation.
 
 ### 8. UI / UX Design
 - **Aesthetic:** "Premium Apple-like" design language. No generic colors. Uses curated HSL tokens, glassmorphism (`backdrop-blur`), subtle micro-animations, and clean dark modes.

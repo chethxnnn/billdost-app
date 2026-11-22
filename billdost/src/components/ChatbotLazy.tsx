@@ -10,6 +10,6 @@ const Chatbot = dynamic(
   { ssr: false },
 )
 
-export function ChatbotLazy() {
-  return <Chatbot />
+export function ChatbotLazy({ shopName }: { shopName?: string }) {
+  return <Chatbot shopName={shopName} />
 }

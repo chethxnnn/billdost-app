@@ -5,6 +5,7 @@ import { ArrowUpRight, ArrowDownRight, Package, Users, Receipt, IndianRupee, Lin
 import { trpc } from '@/lib/trpc/client'
 import { saveActivitySnapshot } from '@/lib/activity-snapshot'
 import { PaymentStatusBadge } from '@/components/invoices/PaymentStatusBadge'
+import AnnouncementBanner from '@/components/dashboard/AnnouncementBanner'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -644,6 +645,9 @@ export default function DashboardPage() {
           {t('dashboard', 'create_invoice')}
         </Link>
       </div>
+
+      {/* Latest platform announcement, when one is unseen */}
+      <AnnouncementBanner />
 
       {/* Quick actions (mobile) */}
       <div className="sm:hidden">

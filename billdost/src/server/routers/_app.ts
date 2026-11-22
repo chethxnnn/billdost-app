@@ -13,6 +13,7 @@ import { searchRouter } from './search'
 import { remindersRouter } from './reminders'
 import { expensesRouter } from './expenses'
 import { paymentsRouter } from './payments'
+import { announcementsRouter } from './announcements'
 
 /**
  * Root tRPC app router.
@@ -33,6 +34,7 @@ export const appRouter = router({
   reminders: remindersRouter,
   expenses: expensesRouter,
   payments: paymentsRouter,
+  announcements: announcementsRouter,
 })
 
 export type AppRouter = typeof appRouter

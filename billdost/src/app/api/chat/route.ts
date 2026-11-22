@@ -1,8 +1,9 @@
 import { google } from '@ai-sdk/google'
-import { streamText, tool, convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
+import { streamText, tool, convertToModelMessages, stepCountIs, createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { requireShopAccess } from '@/server/utils/auth'
+import { answerWithEngine } from '@/server/assistant/engine'
 
 export const maxDuration = 30
 
@@ -33,6 +34,54 @@ export async function POST(req: Request) {
   const validMessages = messages.filter(
     (m) => m && typeof m.role === 'string' && Array.isArray(m.parts) && m.parts.length > 0
   )
+
+  // Deterministic intent engine first (Stage 7): the known daily
+  // questions (aaj ki sales, low stock, udhaar, GST...) are answered
+  // from fixed queries over the shop's real data, composed from
+  // templates, with no model in the loop. Only when the engine has
+  // no confident match does the request fall through to the Gemini
+  // tool-calling flow below, unchanged.
+  const lastUserMessage = [...validMessages].reverse().find((m) => m.role === 'user')
+  const lastUserText = (lastUserMessage?.parts ?? [])
+    .filter((p) => p.type === 'text')
+    .map((p) => (p as { text?: string }).text ?? '')
+    .join(' ')
+    .trim()
+
+  if (lastUserText) {
+    const engineAnswer = await answerWithEngine(supabase, shop, lastUserText)
+    if (engineAnswer) {
+      const stream = createUIMessageStream({
+        execute: ({ writer }) => {
+          writer.write({ type: 'start' })
+          writer.write({
+            type: 'data-assistant-card',
+            data: {
+              intent: engineAnswer.intent.kind,
+              headline: engineAnswer.card.headline,
+              lines: engineAnswer.card.lines,
+              note: engineAnswer.card.note,
+            },
+          })
+          if (engineAnswer.navigate) {
+            writer.write({
+              type: 'data-navigate',
+              data: {
+                destination: engineAnswer.navigate.destination,
+                label: engineAnswer.navigate.label,
+              },
+            })
+          }
+          const textId = 'engine-text'
+          writer.write({ type: 'text-start', id: textId })
+          writer.write({ type: 'text-delta', id: textId, delta: engineAnswer.text })
+          writer.write({ type: 'text-end', id: textId })
+          writer.write({ type: 'finish' })
+        },
+      })
+      return createUIMessageStreamResponse({ stream })
+    }
+  }
 
   const coreMessages = await convertToModelMessages(validMessages)
 
