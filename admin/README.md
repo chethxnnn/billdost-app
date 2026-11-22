@@ -92,6 +92,16 @@ The choice is stored per admin user in `admin_users.ui_theme` and
 mirrored to localStorage (`billdost-admin-theme`) so it applies
 before first paint and follows the account across devices.
 
+## The Pipeline shows every shop
+
+The Pipeline board is driven by website applications, and it also
+includes shops created directly in the Setup Studio, which have no
+application row. Direct shops are mapped into the same stages from
+their lifecycle status (awaiting approval, setup returned, pending
+activation, live, suspended into Live with a flag), carry a small
+Direct tag, and link to the shop page with one status-driven action.
+No shop can exist in the system and be invisible on the board.
+
 ## The founder approval gate
 
 Teammates may help with onboarding (work applications, log calls,

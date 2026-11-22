@@ -418,3 +418,37 @@ In the Supabase dashboard, Authentication, URL Configuration:
    your own phone, open it, set a password, land inside the ready
    shop, and confirm the audit log shows every step. Then create one
    invoice in the shop and watch the dashboard numbers move.
+
+## 7. Fix round (22 Nov 2026): migrations 0023 to 0025
+
+Apply in filename order with the section 2 flow (`supabase db push`
+or the SQL Editor), after 0022. No new environment variables and no
+Auth URL changes: the new pages are token-link pages like
+`/activate/*`, public by design and checked server-side.
+
+- `0023_announcement_reads.sql`: portal announcements become
+  readable in the shop app (audience all, the shop's category, or
+  the shop itself, inside their active window) and gain per-shop
+  seen state (`announcement_reads`). The shop app shows the latest
+  unseen announcement as a dashboard banner and under the bell /
+  Notifications page.
+- `0024_customer_and_catalog_autosave.sql`: `create_invoice_tx` and
+  `create_quotation_tx` now always save the customer (by phone, or
+  by exact name match when no phone is given) and auto-add billed
+  items with no product id to the catalog as untracked products
+  (name matched, never duplicated; stock moves only for items the
+  UI explicitly linked by product id).
+- `0025_staff_activation_tokens.sql`: staff invites stop using the
+  Supabase invite email. The owner creates the staff row in Staff &
+  Roles and sends a one-time activation link (`/join/[token]`,
+  SHA-256 hashed, 72 hours, single use, new link kills the old).
+  The invitee sets their own password on the join page; an invitee
+  whose email already has a BillDost account is routed to sign in
+  and attached through the existing `accept_staff_invite` path.
+
+Behaviour note: the shop assistant (`/api/chat`) now answers the
+known daily questions (sales, low stock, udhaar, GST, payments)
+with a deterministic intent engine over the shop's own data before
+falling back to the Gemini tool-calling flow, which is unchanged.
+The `GOOGLE_GENERATIVE_AI_API_KEY` from section 1 is still required
+for the fallback.

@@ -1,22 +1,33 @@
 import { z } from 'zod'
+import { randomBytes } from 'node:crypto'
 import { router, protectedProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 import { requireOwner, requireShopAccess } from '../utils/auth'
-import { createClient } from '@supabase/supabase-js'
+import { hashActivationToken } from '@/lib/token-hash'
+import { buildJoinLink } from '@/lib/staff-invite'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-function adminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
-/** Finds an existing Supabase auth user by email, or null. */
-async function findAuthUserByEmail(email: string) {
-  const admin = adminClient()
-  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-  if (error) return null
-  return data.users.find((u) => u.email?.toLowerCase() === email) ?? null
+/**
+ * Mint a fresh staff activation link for an invited row (Stage 4,
+ * migration 0025). The raw token is 32 random bytes, base64url; only
+ * its SHA-256 hash reaches the database through
+ * staff_invite_issue_tx, which also kills any earlier live link for
+ * the row. The owner sends the returned link himself (WhatsApp or
+ * copy), so no email ever leaves the system for an invite.
+ */
+async function issueStaffLink(
+  supabase: SupabaseClient,
+  staffMemberId: string
+): Promise<string> {
+  const raw = randomBytes(32).toString('base64url')
+  const { error } = await supabase.rpc('staff_invite_issue_tx', {
+    p_staff_member_id: staffMemberId,
+    p_token_hash: hashActivationToken(raw),
+  })
+  if (error) {
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+  }
+  return buildJoinLink(process.env.NEXT_PUBLIC_APP_URL ?? '', raw)
 }
 
 export const staffRouter = router({
@@ -31,7 +42,7 @@ export const staffRouter = router({
 
     const { data: staff, error } = await supabase
       .from('staff_members')
-      .select('id, user_id, email, name, role, status, created_at')
+      .select('id, user_id, email, name, phone, role, status, created_at')
       .eq('shop_id', shop.id)
       .order('created_at', { ascending: true })
 
@@ -40,37 +51,45 @@ export const staffRouter = router({
   }),
 
   /**
-   * Invite a new staff member (owner only, blueprint C4).
-   * Three cases, none of them a dead end:
-   * 1. The email already has a BillDost account: no invite email is
-   *    sent (inviteUserByEmail would fail); the row is linked to that
-   *    user as invited and activates on their next login through
-   *    accept_staff_invite, or in-app through staff.acceptInvite.
-   * 2. A row already exists for this shop and email: re-invite resets
-   *    it to invited with the new role instead of throwing CONFLICT.
-   *    An already active member with the same role is the only
-   *    conflict, and it says so.
-   * 3. A brand-new email: Supabase sends the invite, landing on
-   *    /auth/callback, which activates the row before anything else.
+   * Invite a new staff member (owner only, Stage 4). No invite email
+   * is sent any more: the row is created in invited state and the
+   * owner gets a one-time activation link to send over WhatsApp or
+   * copy. The invitee opens /join/[token], sees the shop name and
+   * role, and sets their own password; if their email already has a
+   * BillDost account the join page routes them to sign in and the
+   * existing accept_staff_invite path attaches the membership.
+   *
+   * Email and phone are both optional individually, but at least one
+   * is required: email becomes the login id, phone is where the
+   * owner sends the link. An existing row for the same email (or
+   * phone, when no email is given) is re-invited with a fresh link
+   * instead of throwing; an already active member with the same role
+   * is the only conflict, and it says so.
    */
   invite: protectedProcedure
     .input(z.object({
-      email: z.string().email(),
+      email: z.string().email().optional(),
+      phone: z.string().trim().min(10).max(15).optional(),
       name: z.string().min(1).optional(),
       role: z.enum(['manager', 'cashier']).default('cashier')
+    }).refine((d) => Boolean(d.email || d.phone), {
+      message: 'Email ya phone, kam se kam ek chahiye.',
     }))
     .mutation(async ({ ctx, input }) => {
       const { supabase, user } = ctx
       const shop = await requireOwner(supabase, user.id)
-      const email = input.email.toLowerCase()
+      const email = input.email?.toLowerCase()
+      const phone = input.phone?.trim()
 
-      // Existing row for this shop and email?
-      const { data: existingRow } = await supabase
+      // Existing row for this shop and email (or phone)?
+      let existingQuery = supabase
         .from('staff_members')
         .select('id, role, status')
         .eq('shop_id', shop.id)
-        .ilike('email', email)
-        .single()
+      existingQuery = email
+        ? existingQuery.ilike('email', email)
+        : existingQuery.eq('phone', phone!)
+      const { data: existingRow } = await existingQuery.maybeSingle()
 
       if (existingRow) {
         if (existingRow.status === 'active') {
@@ -84,69 +103,37 @@ export const staffRouter = router({
             .select()
             .single()
           if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
-          return data
+          return { staff: data, link: null as string | null }
         }
-        // Re-invite: reset to invited with the (possibly new) role.
+        // Re-invite: reset to invited with the (possibly new) role
+        // and contact details, then mint a fresh link.
         const { data, error } = await supabase
           .from('staff_members')
-          .update({ role: input.role, status: 'invited', name: input.name ?? undefined })
+          .update({
+            role: input.role,
+            status: 'invited',
+            name: input.name ?? undefined,
+            email: email ?? undefined,
+            phone: phone ?? undefined,
+          })
           .eq('id', existingRow.id)
           .select()
           .single()
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
-        return data
-      }
-
-      // Existing BillDost account under this email?
-      const existingUser = await findAuthUserByEmail(email)
-      if (existingUser) {
-        const { data, error } = await supabase
-          .from('staff_members')
-          .insert({
-            shop_id: shop.id,
-            email,
-            name: input.name,
-            role: input.role,
-            status: 'invited',
-            user_id: existingUser.id,
-          })
-          .select()
-          .single()
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
-
-        await supabase.from('activity_log').insert({
-          shop_id: shop.id,
-          type: 'staff_invited',
-          entity_type: 'staff',
-          entity_id: data.id,
-          summary: `${input.name || email} ko ${input.role} invite bheja (existing account)`,
-        })
-        return data
-      }
-
-      // Brand-new email: Supabase sends the invite.
-      const admin = adminClient()
-      const { data: authData, error: authError } = await admin.auth.admin.inviteUserByEmail(
-        email,
-        {
-          data: { name: input.name },
-          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/callback`,
-        }
-      )
-
-      if (authError || !authData.user) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Failed to send email: ${authError?.message}` })
+        const link = await issueStaffLink(supabase, existingRow.id)
+        return { staff: data, link }
       }
 
       const { data, error } = await supabase
         .from('staff_members')
         .insert({
           shop_id: shop.id,
-          email,
+          email: email ?? null,
+          phone: phone ?? null,
           name: input.name,
           role: input.role,
           status: 'invited',
-          user_id: authData.user.id,
+          invited_by: user.id,
         })
         .select()
         .single()
@@ -156,21 +143,64 @@ export const staffRouter = router({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       }
 
+      const link = await issueStaffLink(supabase, data.id)
+
       await supabase.from('activity_log').insert({
         shop_id: shop.id,
         type: 'staff_invited',
         entity_type: 'staff',
         entity_id: data.id,
-        summary: `${input.name || email} ko ${input.role} invite bheja`,
+        summary: `${input.name || email || phone} ko ${input.role} invite link banaya`,
       })
 
-      return data
+      return { staff: data, link }
     }),
 
   /**
-   * Invites addressed to the signed-in user (blueprint C4): rows where
-   * user_id is me and status is invited. The dashboard can surface a
-   * "You have been invited to <shop>" card from this.
+   * Resend the invite link (owner only): a disabled row first comes
+   * back to invited, then a fresh token is minted, which kills the
+   * previous link for that row. Returns the new link for the owner
+   * to send again.
+   */
+  resendInvite: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { supabase, user } = ctx
+      const shop = await requireOwner(supabase, user.id)
+
+      const { data: target } = await supabase
+        .from('staff_members')
+        .select('id, status, role')
+        .eq('id', input.id)
+        .eq('shop_id', shop.id)
+        .single()
+
+      if (!target) throw new TRPCError({ code: 'NOT_FOUND', message: 'Staff member not found' })
+      if (target.role === 'owner') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Owner ke liye invite link nahi banta.' })
+      }
+      if (target.status === 'active') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ye member pehle se active hai.' })
+      }
+      if (target.status === 'disabled') {
+        const { error } = await supabase
+          .from('staff_members')
+          .update({ status: 'invited' })
+          .eq('id', target.id)
+        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      }
+
+      const link = await issueStaffLink(supabase, target.id)
+      return { link }
+    }),
+
+  /**
+   * Invites addressed to the signed-in user (blueprint C4): invited
+   * rows linked to me, or carrying my email. Link-based invites
+   * (Stage 4) leave user_id null until the invitee joins, so the
+   * email match is what surfaces them for existing account holders;
+   * accept_staff_invite matches the same way. The dashboard can
+   * surface a "You have been invited to <shop>" card from this.
    */
   myInvites: protectedProcedure.query(async ({ ctx }) => {
     const { supabase, user } = ctx
@@ -178,8 +208,8 @@ export const staffRouter = router({
     const { data, error } = await supabase
       .from('staff_members')
       .select('id, shop_id, role, status, created_at, shops ( name )')
-      .eq('user_id', user.id)
       .eq('status', 'invited')
+      .or(`user_id.eq.${user.id},email.ilike.${user.email ?? ''}`)
       .order('created_at', { ascending: false })
 
     if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })

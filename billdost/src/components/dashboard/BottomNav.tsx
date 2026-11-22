@@ -18,7 +18,7 @@ export default function BottomNav() {
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-2xl border-t border-black/5 dark:border-white/5 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_rgba(0,0,0,0.02)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.2)]">
-      <div className="flex items-center justify-around h-[68px]">
+      <div className="flex items-end justify-around h-[64px] pb-1.5">
         {ITEMS.map((item) => {
           const Icon = item.icon
           const isActive = item.href === '/dashboard'
@@ -42,14 +42,21 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 py-1 px-3 transition-colors ${
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex flex-col items-center gap-0.5 py-1 px-1 transition-colors ${
                 isActive
                   ? 'text-[#1B7A4A] dark:text-[#25D366]'
                   : 'text-[#6E6E73] dark:text-[#98989D]'
               }`}
             >
-              <Icon className={`w-[22px] h-[22px] transition-transform ${isActive ? 'scale-110 stroke-[2.5px]' : ''}`} />
-              <span className="text-[10px] font-medium tracking-tight">{item.label}</span>
+              <span
+                className={`flex items-center justify-center w-14 h-7 rounded-full transition-all duration-200 ${
+                  isActive ? 'bg-[#1B7A4A]/10 dark:bg-[#25D366]/12' : 'bg-transparent'
+                }`}
+              >
+                <Icon className={`w-[21px] h-[21px] transition-transform duration-200 ${isActive ? 'scale-105 stroke-[2.5px]' : ''}`} />
+              </span>
+              <span className={`text-[10px] tracking-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
             </Link>
           )
         })}

@@ -55,7 +55,7 @@ export default async function DashboardLayout({
       >
         {children}
       </DashboardShell>
-      <ChatbotLazy />
+      <ChatbotLazy shopName={shop.name} />
     </>
   )
 }

@@ -73,183 +73,256 @@ interface NavItem {
   accent?: boolean
 }
 
-// We will define NAV_ITEMS inside the component so we can use the hook
-const getNavItems = (t: any): NavItem[] => [
-  { label: t('sidebar', 'dashboard'), href: '/dashboard', icon: DashboardIcon, badge: null },
-  { label: t('sidebar', 'new_bill'), href: '/invoices/new', icon: PlusIcon, badge: null, accent: true },
-  { label: t('sidebar', 'pos'), href: '/pos', icon: PosIcon, badge: null },
-  { label: t('sidebar', 'invoices'), href: '/invoices', icon: InvoiceIcon, badge: null },
-  { label: t('sidebar', 'quotations'), href: '/quotations', icon: QuoteIcon, badge: null },
-  { label: t('sidebar', 'customers'), href: '/customers', icon: CustomersIcon, badge: null },
-  { label: t('sidebar', 'udhaar'), href: '/udhaar', icon: UdhaarIcon, badge: null },
-  { label: t('sidebar', 'payments'), href: '/payments', icon: PaymentsIcon, badge: null },
-  { label: t('sidebar', 'catalog'), href: '/catalog', icon: CatalogIcon, badge: null },
-  { label: t('sidebar', 'inventory'), href: '/inventory', icon: InventoryIcon, badge: null },
-  { label: t('sidebar', 'low_stock'), href: '/low-stock', icon: LowStockIcon, badge: null },
-  { label: t('sidebar', 'expenses'), href: '/expenses', icon: ExpensesIcon, badge: null },
-  { label: t('sidebar', 'analytics'), href: '/analytics', icon: AnalyticsIcon, badge: null },
-  { label: t('sidebar', 'gst_report'), href: '/reports/gst', icon: GstIcon, badge: null },
+interface NavGroup {
+  key: string
+  label: string
+  items: NavItem[]
+}
+
+// Grouped navigation (Stage 5). The groups are sized so the whole
+// rail fits a laptop viewport: compact 36px rows, tighter still on
+// short screens, and NO internal scrollbar anywhere in the sidebar.
+// The page scrolls; the sidebar never does.
+const getNavGroups = (t: any): NavGroup[] => [
+  {
+    key: 'main',
+    label: 'Main',
+    items: [
+      { label: t('sidebar', 'dashboard'), href: '/dashboard', icon: DashboardIcon, badge: null },
+      { label: t('sidebar', 'new_bill'), href: '/invoices/new', icon: PlusIcon, badge: null, accent: true },
+      { label: t('sidebar', 'pos'), href: '/pos', icon: PosIcon, badge: null },
+      { label: t('sidebar', 'invoices'), href: '/invoices', icon: InvoiceIcon, badge: null },
+      { label: t('sidebar', 'quotations'), href: '/quotations', icon: QuoteIcon, badge: null },
+    ],
+  },
+  {
+    key: 'manage',
+    label: 'Manage',
+    items: [
+      { label: t('sidebar', 'customers'), href: '/customers', icon: CustomersIcon, badge: null },
+      { label: t('sidebar', 'udhaar'), href: '/udhaar', icon: UdhaarIcon, badge: null },
+      { label: t('sidebar', 'payments'), href: '/payments', icon: PaymentsIcon, badge: null },
+      { label: t('sidebar', 'catalog'), href: '/catalog', icon: CatalogIcon, badge: null },
+      { label: t('sidebar', 'inventory'), href: '/inventory', icon: InventoryIcon, badge: null },
+      { label: t('sidebar', 'low_stock'), href: '/low-stock', icon: LowStockIcon, badge: null },
+      { label: t('sidebar', 'expenses'), href: '/expenses', icon: ExpensesIcon, badge: null },
+    ],
+  },
+  {
+    key: 'account',
+    label: 'Account',
+    items: [
+      { label: t('sidebar', 'analytics'), href: '/analytics', icon: AnalyticsIcon, badge: null },
+      { label: t('sidebar', 'gst_report'), href: '/reports/gst', icon: GstIcon, badge: null },
+      { label: 'WhatsApp', href: '/settings/whatsapp', icon: (props: any) => <Globe {...props} />, badge: null },
+    ],
+  },
 ]
 
-const getBottomItems = (t: any) => [
-  { label: t('sidebar', 'settings'), href: '/settings', icon: SettingsIcon },
-  { label: 'WhatsApp', href: '/settings/whatsapp', icon: (props: any) => <Globe {...props} /> },
-]
+const CASHIER_HIDDEN = ['/analytics', '/reports/gst', '/expenses', '/low-stock']
+
+const rowClass =
+  'relative flex items-center gap-3 px-3 h-9 [@media(max-height:840px)]:h-8 rounded-xl text-[13.5px] transition-colors duration-150 group'
 
 export default function Sidebar({ collapsed, onToggle, shopName, shopCategory, userName, role }: Props) {
   const pathname = usePathname()
   const { t } = useTranslation()
   const logout = useLogout()
-  
-  // Filter nav items based on role
-  const rawNavItems = getNavItems(t)
-  const navItems = rawNavItems.filter(item => {
-    if (role === 'cashier' && item.href === '/analytics') return false
-    if (role === 'cashier' && item.href === '/reports/gst') return false
-    if (role === 'cashier' && item.href === '/expenses') return false
-    if (role === 'cashier' && item.href === '/low-stock') return false
-    if (role === 'cashier' && item.href === '/staff') return false // If staff page exists
-    return true
-  })
 
-  const rawBottomItems = getBottomItems(t)
-  const bottomItems = rawBottomItems.filter(item => {
-    if (role === 'cashier' && item.href === '/settings') return false
-    return true
-  })
+  const groups = getNavGroups(t)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => !(role === 'cashier' && CASHIER_HIDDEN.includes(item.href))
+      ),
+    }))
+    .filter((group) => group.items.length > 0)
+
+  const settingsVisible = role !== 'cashier'
+  const settingsActive = pathname.startsWith('/settings') && !pathname.startsWith('/settings/whatsapp')
+  const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : ''
+  const categoryLabel = shopCategory
+    ? shopCategory.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+    : ''
 
   return (
     <aside
-      className={`hidden lg:flex flex-col bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-2xl border-r border-black/5 dark:border-white/5 h-screen sticky top-0 transition-all duration-300 z-40 ${
-        collapsed ? 'w-[72px]' : 'w-[260px]'
+      className={`hidden lg:flex flex-col bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-2xl border-r border-black/5 dark:border-white/5 h-screen sticky top-0 transition-[width] duration-300 z-40 ${
+        collapsed ? 'w-[72px]' : 'w-[248px]'
       }`}
     >
-      {/* Shop header & Logo */}
-      <div className="px-4 h-[72px] flex items-center gap-3 border-b border-black/5 dark:border-white/5 relative overflow-hidden transition-all duration-300">
+      {/* Shop identity header */}
+      <div className="px-4 h-16 flex items-center gap-3 border-b border-black/5 dark:border-white/5 flex-shrink-0">
         <div className="w-10 h-10 rounded-[14px] bg-gradient-to-br from-[#1B7A4A] to-[#25D366] shadow-sm shadow-[#1B7A4A]/20 flex items-center justify-center flex-shrink-0">
           <span className="text-white text-[15px] font-semibold tracking-tight font-display">
             {shopName.charAt(0).toUpperCase()}
           </span>
         </div>
         <div
-          className={`flex flex-col whitespace-nowrap transition-all duration-300 ${
-            collapsed ? 'opacity-0 translate-x-4 pointer-events-none w-0' : 'opacity-100 translate-x-0 w-auto'
+          className={`flex flex-col whitespace-nowrap transition-opacity duration-200 ${
+            collapsed ? 'opacity-0 pointer-events-none w-0 overflow-hidden' : 'opacity-100 w-auto'
           }`}
         >
           <div className="font-semibold text-[15px] tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] truncate leading-tight">
-            {userName}
+            {shopName}
           </div>
           <div className="text-[12px] font-medium text-[#6E6E73] dark:text-[#98989D] truncate leading-tight">
-            {shopName}
+            {categoryLabel || 'BillDost'}
           </div>
         </div>
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-          const Icon = item.icon
+      {/* Grouped nav: no overflow, no internal scrollbar */}
+      <nav className="flex-1 min-h-0 px-3 py-4 flex flex-col gap-5 [@media(max-height:840px)]:gap-3.5">
+        {groups.map((group) => (
+          <div key={group.key}>
+            {collapsed ? (
+              <div className="mx-2 mb-2 border-t border-black/5 dark:border-white/10 first:border-t-0 first:mb-0" aria-hidden="true" />
+            ) : (
+              <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6E6E73] dark:text-[#98989D]">
+                {group.label}
+              </div>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+                const Icon = item.icon
 
-          if (item.accent) {
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-300 bg-[#1B7A4A] hover:bg-[#155F3A] hover:scale-[0.98] text-white shadow-sm shadow-[#1B7A4A]/20 ${
-                  collapsed ? 'justify-center mx-1' : ''
-                }`}
-              >
-                <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            )
-          }
+                if (item.accent) {
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-label={item.label}
+                      title={collapsed ? item.label : undefined}
+                      className={`${rowClass} bg-[#1B7A4A] hover:bg-[#155F3A] active:scale-[0.98] text-white font-semibold shadow-sm shadow-[#1B7A4A]/20 ${
+                        collapsed ? 'justify-center px-0' : ''
+                      }`}
+                    >
+                      <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                      {!collapsed && <span className="tracking-tight">{item.label}</span>}
+                    </Link>
+                  )
+                }
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] transition-all duration-200 group ${
-                isActive
-                  ? 'text-[#1B7A4A] dark:text-[#25D366] font-semibold bg-[#1B7A4A]/10 dark:bg-[#25D366]/10'
-                  : 'text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/5 dark:hover:bg-white/5 font-medium'
-              } ${collapsed ? 'justify-center' : ''}`}
-            >
-              <Icon className={`w-[18px] h-[18px] flex-shrink-0 transition-transform group-hover:scale-105 ${isActive ? 'stroke-[2.5px]' : ''}`} />
-              {!collapsed && (
-                <>
-                  <span className="flex-1 tracking-tight">{item.label}</span>
-                  {item.badge && (
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                      item.badge.includes('low')
-                        ? 'bg-[#FF3B30]/10 text-[#FF3B30] dark:bg-[#FF453A]/20 dark:text-[#FF453A]'
-                        : 'bg-black/5 text-[#6E6E73] dark:bg-white/10 dark:text-[#98989D]'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </>
-              )}
-            </Link>
-          )
-        })}
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
+                    title={collapsed ? item.label : undefined}
+                    className={`${rowClass} ${
+                      isActive
+                        ? 'text-[#1B7A4A] dark:text-[#25D366] font-semibold'
+                        : 'text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/5 dark:hover:bg-white/5 font-medium active:scale-[0.99]'
+                    } ${collapsed ? 'justify-center px-0' : ''}`}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="sidebar-active-pill"
+                        className="absolute inset-0 rounded-xl bg-[#1B7A4A]/10 dark:bg-[#25D366]/12"
+                        transition={{ type: 'spring', stiffness: 500, damping: 38, mass: 0.9 }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <Icon className={`relative w-[18px] h-[18px] flex-shrink-0 transition-transform duration-150 group-hover:scale-105 ${isActive ? 'stroke-[2.5px]' : ''}`} />
+                    {!collapsed && (
+                      <>
+                        <span className="relative flex-1 tracking-tight truncate">{item.label}</span>
+                        {item.badge && (
+                          <span className={`relative text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                            item.badge.includes('low')
+                              ? 'bg-[#FF3B30]/10 text-[#FF3B30] dark:bg-[#FF453A]/20 dark:text-[#FF453A]'
+                              : 'bg-black/5 text-[#6E6E73] dark:bg-white/10 dark:text-[#98989D]'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      {/* Bottom section (Settings + Language Toggle) */}
-      <div className="p-3 space-y-1 border-t border-black/5 dark:border-white/5">
+      {/* Bottom block: language, user card, settings, sign out, collapse */}
+      <div className="px-3 pb-3 pt-2 border-t border-black/5 dark:border-white/5 flex-shrink-0 space-y-1">
         {!collapsed && (
-          <div className="px-3 py-1">
+          <div className="px-1 pb-1">
             <LanguageSwitcher />
           </div>
         )}
 
-        {bottomItems.map((item) => {
-          const isActive = pathname.startsWith(item.href)
-          const Icon = item.icon
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-300 ${
-                isActive
-                  ? 'bg-black/5 dark:bg-white/10 text-[#1D1D1F] dark:text-[#F5F5F7]'
-                  : 'text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'
-              } ${collapsed ? 'justify-center mx-1' : ''}`}
-            >
-              <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          )
-        })}
+        {/* User card */}
+        <div
+          className={`flex items-center gap-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/5 px-2.5 py-2 ${
+            collapsed ? 'justify-center px-0 bg-transparent dark:bg-transparent' : ''
+          }`}
+        >
+          <div className="w-8 h-8 rounded-full bg-[#1B7A4A]/12 dark:bg-[#25D366]/15 flex items-center justify-center flex-shrink-0">
+            <span className="text-[#1B7A4A] dark:text-[#25D366] text-[13px] font-bold">
+              {(userName || shopName).charAt(0).toUpperCase()}
+            </span>
+          </div>
+          {!collapsed && (
+            <div className="flex flex-col min-w-0">
+              <span className="text-[13px] font-semibold tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] truncate leading-tight">
+                {userName}
+              </span>
+              <span className="text-[11px] font-medium text-[#6E6E73] dark:text-[#98989D] leading-tight">
+                {roleLabel}
+              </span>
+            </div>
+          )}
+        </div>
 
-        {/* Logout (desktop surface; mobile uses Settings) */}
+        {settingsVisible && (
+          <Link
+            href="/settings"
+            aria-label={t('sidebar', 'settings')}
+            aria-current={settingsActive ? 'page' : undefined}
+            title={collapsed ? t('sidebar', 'settings') : undefined}
+            className={`${rowClass} ${
+              settingsActive
+                ? 'text-[#1B7A4A] dark:text-[#25D366] font-semibold bg-[#1B7A4A]/10 dark:bg-[#25D366]/12'
+                : 'text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] font-medium'
+            } ${collapsed ? 'justify-center px-0' : ''}`}
+          >
+            <SettingsIcon className="w-[18px] h-[18px] flex-shrink-0" />
+            {!collapsed && <span className="tracking-tight">{t('sidebar', 'settings')}</span>}
+          </Link>
+        )}
+
         <button
           onClick={() => void logout()}
           aria-label="Logout"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium text-[#FF3B30] dark:text-[#FF453A] hover:bg-[#FF3B30]/10 dark:hover:bg-[#FF453A]/10 transition-all w-full min-h-[44px] ${
-            collapsed ? 'justify-center' : ''
+          title={collapsed ? 'Logout' : undefined}
+          className={`${rowClass} w-full text-left text-[#FF3B30] dark:text-[#FF453A] hover:bg-[#FF3B30]/10 dark:hover:bg-[#FF453A]/10 font-medium ${
+            collapsed ? 'justify-center px-0' : ''
           }`}
         >
           <LogOut className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
-          {!collapsed && <span>Logout</span>}
+          {!collapsed && <span className="tracking-tight">Logout</span>}
         </button>
 
-        {/* Collapse toggle */}
         <button
           onClick={onToggle}
           aria-label={collapsed ? 'Sidebar kholo' : 'Sidebar band karo'}
-          className={`flex items-center gap-3 px-3 py-2.5 mt-1 rounded-xl text-[14px] font-medium text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] transition-all w-full ${
-            collapsed ? 'justify-center' : ''
+          title={collapsed ? 'Expand' : 'Collapse'}
+          className={`${rowClass} w-full text-left text-[#6E6E73] dark:text-[#98989D] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] font-medium ${
+            collapsed ? 'justify-center px-0' : ''
           }`}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${collapsed ? 'rotate-180' : ''}`}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`flex-shrink-0 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} aria-hidden="true">
             <path d="M11 17l-5-5 5-5" /><path d="M18 17l-5-5 5-5" />
           </svg>
-          {!collapsed && <span>Collapse</span>}
+          {!collapsed && <span className="tracking-tight">Collapse</span>}
         </button>
       </div>
     </aside>
   )
 }
-

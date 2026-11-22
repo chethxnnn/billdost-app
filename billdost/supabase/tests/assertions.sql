@@ -1213,4 +1213,307 @@ begin
 end;
 $$;
 
+-- ASSERT: announcements_visibility_and_reads
+-- Fixture announcements (written as service role): one for everyone,
+-- one for the demo shop's category, one for another category, one
+-- aimed at the demo shop, one aimed at a different shop, one not yet
+-- started, one already ended. The demo owner must see exactly three.
+insert into auth.users (id, email)
+values ('55555555-5555-5555-5555-555555555555', 'other-owner@harness.local')
+on conflict (id) do nothing;
+insert into public.shops (id, owner_id, name, slug, category)
+values ('44444444-4444-4444-4444-444444444444',
+        '55555555-5555-5555-5555-555555555555',
+        'Other Shop', 'other-shop-harness', 'salon')
+on conflict (id) do nothing;
+insert into public.announcements (id, title, body, audience, category, shop_id, starts_at, ends_at)
+values
+  ('b1111111-0000-0000-0000-000000000001', 'For all', 'x', 'all', null, null, now() - interval '1 hour', null),
+  ('b1111111-0000-0000-0000-000000000002', 'For grocery', 'x', 'category', 'grocery', null, now() - interval '1 hour', null),
+  ('b1111111-0000-0000-0000-000000000003', 'For salons', 'x', 'category', 'salon', null, now() - interval '1 hour', null),
+  ('b1111111-0000-0000-0000-000000000004', 'For demo shop', 'x', 'shop', null, '22222222-2222-2222-2222-222222222222', now() - interval '1 hour', null),
+  ('b1111111-0000-0000-0000-000000000005', 'For another shop', 'x', 'shop', null, '44444444-4444-4444-4444-444444444444', now() - interval '1 hour', null),
+  ('b1111111-0000-0000-0000-000000000006', 'Future', 'x', 'all', null, null, now() + interval '1 day', null),
+  ('b1111111-0000-0000-0000-000000000007', 'Expired', 'x', 'all', null, null, now() - interval '2 days', now() - interval '1 day')
+on conflict (id) do nothing;
+select set_config('test.uid', '11111111-1111-1111-1111-111111111111', false);
+select set_config('test.email', 'owner@demo.billdost.local', false);
+set role authenticated;
+do $$
+declare
+  v_count int;
+  v_denied boolean := false;
+begin
+  select count(*) into v_count from public.announcements;
+  if v_count <> 3 then
+    raise exception 'ASSERT FAIL announcements: owner saw % announcements, expected 3', v_count;
+  end if;
+  if not exists (select 1 from public.announcements where id = 'b1111111-0000-0000-0000-000000000002') then
+    raise exception 'ASSERT FAIL announcements: category-targeted announcement missing';
+  end if;
+  if exists (select 1 from public.announcements where id in (
+    'b1111111-0000-0000-0000-000000000003',
+    'b1111111-0000-0000-0000-000000000005',
+    'b1111111-0000-0000-0000-000000000006',
+    'b1111111-0000-0000-0000-000000000007')) then
+    raise exception 'ASSERT FAIL announcements: owner saw a mistargeted or out-of-window announcement';
+  end if;
+
+  -- Seen state: the member can record a read for their own shop.
+  insert into public.announcement_reads (announcement_id, shop_id)
+  values ('b1111111-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222');
+  select count(*) into v_count from public.announcement_reads
+  where shop_id = '22222222-2222-2222-2222-222222222222';
+  if v_count <> 1 then
+    raise exception 'ASSERT FAIL announcements: read row not recorded';
+  end if;
+
+  -- But not for a shop they do not belong to.
+  begin
+    insert into public.announcement_reads (announcement_id, shop_id)
+    values ('b1111111-0000-0000-0000-000000000001', '44444444-4444-4444-4444-444444444444');
+  exception when others then
+    v_denied := true;
+  end;
+  if not v_denied then
+    raise exception 'ASSERT FAIL announcements: read insert for a foreign shop was not denied';
+  end if;
+end;
+$$;
+reset role;
+select set_config('test.uid', '', false);
+select set_config('test.email', '', false);
+
+-- ASSERT: autosave_name_only_customer_survives_cancel
+do $$
+declare
+  v_shop uuid := '22222222-2222-2222-2222-222222222222';
+  v_owner uuid := '11111111-1111-1111-1111-111111111111';
+  v_pid uuid;
+  v_payload jsonb;
+  v_inv uuid;
+  v_cust uuid;
+begin
+  v_pid := pg_temp.make_product('Harness Cust Item', 40, false, 100);
+  v_payload := pg_temp.payload(v_pid, 1, 100, 0);
+  v_payload := jsonb_set(v_payload, '{customer_name}', '"Walk-in Rani"'::jsonb);
+  v_inv := public.create_invoice_tx(v_shop, v_owner, v_payload);
+  select customer_id into v_cust from public.invoices where id = v_inv;
+  if v_cust is null then
+    raise exception 'ASSERT FAIL autosave customer: invoice has no customer_id';
+  end if;
+  if not exists (
+    select 1 from public.customers
+    where id = v_cust and shop_id = v_shop and name = 'Walk-in Rani' and phone is null
+  ) then
+    raise exception 'ASSERT FAIL autosave customer: name-only customer row missing';
+  end if;
+  perform public.cancel_invoice_tx(v_inv, 'harness cancel', v_owner);
+  if not exists (select 1 from public.customers where id = v_cust) then
+    raise exception 'ASSERT FAIL autosave customer: customer vanished after cancel';
+  end if;
+end;
+$$;
+
+-- ASSERT: autosave_phone_dedupe_still_works
+do $$
+declare
+  v_shop uuid := '22222222-2222-2222-2222-222222222222';
+  v_owner uuid := '11111111-1111-1111-1111-111111111111';
+  v_pid uuid;
+  v_payload jsonb;
+  v_inv uuid;
+  v_cust uuid;
+  v_seed uuid;
+  v_count int;
+begin
+  select id into v_seed from public.customers
+  where shop_id = v_shop and phone = '9812345670';
+  select count(*) into v_count from public.customers where shop_id = v_shop;
+  v_pid := pg_temp.make_product('Harness Dedupe Item', 40, false, 100);
+  v_payload := pg_temp.payload(v_pid, 1, 100, 0);
+  v_payload := jsonb_set(v_payload, '{customer_name}', '"Ramesh Gupta"'::jsonb);
+  v_payload := jsonb_set(v_payload, '{customer_phone}', '"9812345670"'::jsonb);
+  v_inv := public.create_invoice_tx(v_shop, v_owner, v_payload);
+  select customer_id into v_cust from public.invoices where id = v_inv;
+  if v_cust <> v_seed then
+    raise exception 'ASSERT FAIL phone dedupe: invoice linked %, seed customer is %', v_cust, v_seed;
+  end if;
+  select count(*) into v_count from public.customers
+  where shop_id = v_shop and phone = '9812345670';
+  if v_count <> 1 then
+    raise exception 'ASSERT FAIL phone dedupe: % customers share the seed phone', v_count;
+  end if;
+end;
+$$;
+
+-- ASSERT: autosave_new_item_joins_catalog
+do $$
+declare
+  v_shop uuid := '22222222-2222-2222-2222-222222222222';
+  v_owner uuid := '11111111-1111-1111-1111-111111111111';
+  v_payload jsonb;
+  v_inv uuid;
+  v_inv2 uuid;
+  v_prod uuid;
+  v_prod2 uuid;
+  v_stock numeric;
+  v_price numeric;
+  v_count int;
+begin
+  v_payload := jsonb_build_object(
+    'customer_name', 'Catalog Tester',
+    'amount_paid', 0,
+    'totals', jsonb_build_object(
+      'subtotal', 100, 'discount_amt', 0, 'taxable_amt', 100,
+      'cgst_amt', 0, 'sgst_amt', 0, 'igst_amt', 0,
+      'round_off_amt', 0, 'total', 100
+    ),
+    'items', jsonb_build_array(jsonb_build_object(
+      'name', 'Harness New Sweet', 'unit', 'piece', 'quantity', 2,
+      'unit_price', 50, 'tax_rate', 0, 'discount_amt', 0,
+      'taxable_amt', 100, 'tax_amt', 0, 'total', 100
+    ))
+  );
+  v_inv := public.create_invoice_tx(v_shop, v_owner, v_payload);
+  select product_id into v_prod from public.invoice_items where invoice_id = v_inv;
+  if v_prod is null then
+    raise exception 'ASSERT FAIL catalog: invoice line was not linked to a product';
+  end if;
+  select stock_qty, price into v_stock, v_price from public.products where id = v_prod;
+  if v_stock is not null then
+    raise exception 'ASSERT FAIL catalog: auto product must be untracked, stock is %', v_stock;
+  end if;
+  if v_price <> 50 then
+    raise exception 'ASSERT FAIL catalog: auto product price is %, expected 50', v_price;
+  end if;
+
+  -- A second bill with the same name (different case and padding)
+  -- reuses the product instead of duplicating it.
+  v_payload := jsonb_set(v_payload, '{items,0,name}', '" harness new sweet "'::jsonb);
+  v_inv2 := public.create_invoice_tx(v_shop, v_owner, v_payload);
+  select product_id into v_prod2 from public.invoice_items where invoice_id = v_inv2;
+  if v_prod2 <> v_prod then
+    raise exception 'ASSERT FAIL catalog: second bill linked a different product';
+  end if;
+  select count(*) into v_count from public.products
+  where shop_id = v_shop and lower(trim(name)) = 'harness new sweet';
+  if v_count <> 1 then
+    raise exception 'ASSERT FAIL catalog: % products share the normalized name', v_count;
+  end if;
+  select count(*) into v_count from public.inventory_logs
+  where product_id = v_prod and type = 'SALE';
+  if v_count <> 0 then
+    raise exception 'ASSERT FAIL catalog: name-matched lines must not write SALE logs, got %', v_count;
+  end if;
+end;
+$$;
+
+-- ASSERT: autosave_quotation_saves_customer_and_product
+do $$
+declare
+  v_shop uuid := '22222222-2222-2222-2222-222222222222';
+  v_owner uuid := '11111111-1111-1111-1111-111111111111';
+  v_payload jsonb;
+  v_qid uuid;
+  v_cust uuid;
+  v_prod uuid;
+begin
+  v_payload := jsonb_build_object(
+    'customer_name', 'Quote Walk-in',
+    'totals', jsonb_build_object(
+      'subtotal', 80, 'discount_amt', 0, 'taxable_amt', 80,
+      'cgst_amt', 0, 'sgst_amt', 0, 'igst_amt', 0,
+      'round_off_amt', 0, 'total', 80
+    ),
+    'items', jsonb_build_array(jsonb_build_object(
+      'name', 'Harness Quote New Item', 'unit', 'piece', 'quantity', 1,
+      'unit_price', 80, 'tax_rate', 0, 'discount_amt', 0,
+      'taxable_amt', 80, 'tax_amt', 0, 'total', 80
+    ))
+  );
+  v_qid := public.create_quotation_tx(v_shop, v_owner, v_payload);
+  select customer_id into v_cust from public.quotations where id = v_qid;
+  if v_cust is null or not exists (
+    select 1 from public.customers where id = v_cust and name = 'Quote Walk-in'
+  ) then
+    raise exception 'ASSERT FAIL quotation autosave: customer not saved';
+  end if;
+  select product_id into v_prod from public.quotation_items where quotation_id = v_qid;
+  if v_prod is null or not exists (
+    select 1 from public.products where id = v_prod and stock_qty is null
+  ) then
+    raise exception 'ASSERT FAIL quotation autosave: product not created and linked';
+  end if;
+end;
+$$;
+
+-- ASSERT: staff_invite_link_lifecycle
+-- Fixtures: an invited cashier row on the demo shop, and an auth
+-- user who already holds the invited email (so lookup must report
+-- account_exists). The owner issues a link, a second issue replaces
+-- the first, consume activates the row, and issuing for an active
+-- member must fail.
+insert into auth.users (id, email)
+values ('66666666-6666-6666-6666-666666666666', 'newcashier@harness.local')
+on conflict (id) do nothing;
+insert into public.staff_members (id, shop_id, email, name, role, status)
+values ('c2222222-0000-0000-0000-000000000001',
+        '22222222-2222-2222-2222-222222222222',
+        'newcashier@harness.local', 'New Cashier', 'cashier', 'invited')
+on conflict (id) do nothing;
+select set_config('test.uid', '11111111-1111-1111-1111-111111111111', false);
+select set_config('test.email', 'owner@demo.billdost.local', false);
+do $$
+declare
+  v_staff uuid := 'c2222222-0000-0000-0000-000000000001';
+  v_shop uuid := '22222222-2222-2222-2222-222222222222';
+  v_lookup jsonb;
+  v_status text;
+  v_uid uuid;
+  v_blocked boolean := false;
+begin
+  perform public.staff_invite_issue_tx(v_staff, 'harness-staff-hash-one');
+  v_lookup := public.staff_invite_lookup('harness-staff-hash-one');
+  if v_lookup ->> 'state' <> 'valid' then
+    raise exception 'ASSERT FAIL staff invite: first lookup state is %', v_lookup ->> 'state';
+  end if;
+  if v_lookup ->> 'role' <> 'cashier' or v_lookup ->> 'shop_name' is null then
+    raise exception 'ASSERT FAIL staff invite: lookup payload missing role or shop name';
+  end if;
+  if (v_lookup ->> 'account_exists')::boolean is not true then
+    raise exception 'ASSERT FAIL staff invite: account_exists should be true for the seeded auth user';
+  end if;
+
+  perform public.staff_invite_issue_tx(v_staff, 'harness-staff-hash-two');
+  v_lookup := public.staff_invite_lookup('harness-staff-hash-one');
+  if v_lookup ->> 'state' <> 'replaced' then
+    raise exception 'ASSERT FAIL staff invite: old link state is %, expected replaced', v_lookup ->> 'state';
+  end if;
+
+  if public.staff_invite_consume_tx('harness-staff-hash-two', '66666666-6666-6666-6666-666666666666') <> v_shop then
+    raise exception 'ASSERT FAIL staff invite: consume returned the wrong shop';
+  end if;
+  select status, user_id into v_status, v_uid from public.staff_members where id = v_staff;
+  if v_status <> 'active' or v_uid <> '66666666-6666-6666-6666-666666666666'::uuid then
+    raise exception 'ASSERT FAIL staff invite: row not activated and linked (status %, uid %)', v_status, v_uid;
+  end if;
+  v_lookup := public.staff_invite_lookup('harness-staff-hash-two');
+  if v_lookup ->> 'state' <> 'used' then
+    raise exception 'ASSERT FAIL staff invite: burned link state is %, expected used', v_lookup ->> 'state';
+  end if;
+
+  begin
+    perform public.staff_invite_issue_tx(v_staff, 'harness-staff-hash-three');
+  exception when others then
+    v_blocked := true;
+  end;
+  if not v_blocked then
+    raise exception 'ASSERT FAIL staff invite: issuing a link for an active member succeeded';
+  end if;
+end;
+$$;
+select set_config('test.uid', '', false);
+select set_config('test.email', '', false);
+
 select 'HARNESS_ASSERTIONS_COMPLETE' as pass_marker;
