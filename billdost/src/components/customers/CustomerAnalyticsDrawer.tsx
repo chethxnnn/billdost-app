@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { PaymentStatusBadge } from '@/components/invoices/PaymentStatusBadge'
+import { Drawer } from '@/components/ui/Modal'
 
 /* ─── Helpers ─── */
 const formatINR = (n: number) =>
@@ -43,24 +43,15 @@ export default function CustomerAnalyticsDrawer({
     { enabled: !!customerId && open }
   )
 
-  useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = 'auto'
-    return () => { document.body.style.overflow = 'auto' }
-  }, [open])
-
-  if (!open) return null
-
+  // Shared Drawer (portal at body level, scroll lock included):
+  // stays mounted while closed so it slides in and out.
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] transition-opacity duration-300" 
-        onClick={onClose}
-      />
-
-      {/* Drawer */}
-      <div className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-[#F5F5F7] dark:bg-[#000000] shadow-2xl z-[70] flex flex-col transform transition-transform duration-300 ease-in-out border-l border-white/20 dark:border-white/5">
+    <Drawer
+      open={open}
+      onClose={onClose}
+      ariaLabel="Customer Profile"
+      panelClassName="md:w-[480px] bg-[#F5F5F7] dark:bg-[#000000] flex flex-col"
+    >
         
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-black/5 dark:border-white/5 bg-white dark:bg-[#1C1C1E] flex items-center justify-between sticky top-0 z-10">
@@ -160,7 +151,6 @@ export default function CustomerAnalyticsDrawer({
             </>
           )}
         </div>
-      </div>
-    </>
+    </Drawer>
   )
 }

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search } from 'lucide-react'
+import { Search, PackageOpen } from 'lucide-react'
 
 interface Product {
   id: string
@@ -42,10 +43,23 @@ export function QuickAddGrid({ onAddProduct, large = false }: Props) {
   }, [products, search, activeCategory])
 
   if (isLoading) {
+    // Skeleton tiles in the real card shell (fix round 2, Stage 5):
+    // the old spinner floated in an unstyled box, and inside the
+    // bill page's tall right panel the whole area read as a blank
+    // white slab while loading, and nearly the same when the
+    // catalog was empty (one small grey line). Both states are now
+    // unmistakable.
     return (
-      <div className="h-full flex flex-col items-center justify-center space-y-4">
-        <div className="animate-spin w-8 h-8 border-4 border-[#1B7A4A] border-t-transparent rounded-full" />
-        <p className="text-sm font-medium text-gray-500">Loading catalog...</p>
+      <div className="flex flex-col h-full bg-white dark:bg-[#1C1C1E] rounded-3xl border border-gray-100 dark:border-[#38383A] overflow-hidden shadow-sm" aria-busy="true" aria-label="Catalog load ho raha hai">
+        <div className="p-4 border-b border-gray-100 dark:border-[#38383A] space-y-4 bg-gray-50/50 dark:bg-white/5">
+          <div className="h-5 w-28 rounded-md bg-black/[0.07] dark:bg-white/[0.09] animate-pulse" />
+          <div className="h-9 w-full rounded-xl bg-black/[0.05] dark:bg-white/[0.07] animate-pulse" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 p-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-[92px] rounded-2xl bg-black/[0.04] dark:bg-white/[0.05] animate-pulse" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -95,12 +109,38 @@ export function QuickAddGrid({ onAddProduct, large = false }: Props) {
       {/* Products Grid */}
       <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
         <AnimatePresence mode="popLayout">
-          {filteredProducts.length === 0 ? (
-            <motion.div 
+          {filteredProducts.length === 0 && (!products || products.length === 0) ? (
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className="text-center py-10"
+              className="h-full flex flex-col items-center justify-center text-center px-6 py-10"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-[#1B7A4A]/10 dark:bg-[#25D366]/10 flex items-center justify-center mb-3">
+                <PackageOpen className="w-7 h-7 text-[#1B7A4A] dark:text-[#25D366]" aria-hidden="true" />
+              </div>
+              <p className="font-bold text-[15px] text-gray-900 dark:text-white">Catalog ke items yahan dikhenge</p>
+              <p className="text-sm text-gray-500 dark:text-[#98989D] font-medium mt-1 max-w-[260px]">
+                Pehle Catalog mein items add karo, phir yahan tap karke bill mein jaldi add ho jayenge.
+              </p>
+              <Link
+                href="/catalog"
+                className="tap mt-4 inline-flex items-center min-h-[44px] px-5 rounded-xl bg-[#1B7A4A] hover:bg-[#155F3A] text-white text-sm font-bold transition-colors"
+              >
+                Catalog kholo
+              </Link>
+            </motion.div>
+          ) : filteredProducts.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="text-center py-10 px-4"
             >
               <p className="text-gray-400 text-sm font-medium">No items found.</p>
+              <button
+                type="button"
+                onClick={() => { setSearch(''); setActiveCategory('All') }}
+                className="mt-2 text-sm font-bold text-[#1B7A4A] dark:text-[#25D366] hover:underline"
+              >
+                Search saaf karo
+              </button>
             </motion.div>
           ) : (
             <div className={`grid grid-cols-2 lg:grid-cols-3 ${large ? 'gap-4' : 'gap-3'}`}>

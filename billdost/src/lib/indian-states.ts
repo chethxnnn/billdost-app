@@ -77,3 +77,18 @@ export function normaliseStateCode(
   if (stateCode && /^\d{2}$/.test(stateCode)) return stateCode
   return stateCodeForName(state)
 }
+
+/**
+ * GSTIN format: 15 characters = 2 digit state code, 5 letters
+ * (PAN holder), 4 digits, 1 letter, 1 alphanumeric entity code,
+ * the letter Z, and 1 alphanumeric check character. Format only:
+ * this does not verify the checksum digit or that the number is
+ * actually issued.
+ */
+export const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}Z[0-9A-Z]{1}$/
+
+/** True when the value is a correctly formatted GSTIN. */
+export function isValidGstin(value: string | null | undefined): boolean {
+  if (!value) return false
+  return GSTIN_PATTERN.test(value.trim().toUpperCase())
+}

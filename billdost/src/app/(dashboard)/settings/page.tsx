@@ -9,6 +9,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation'
 import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher'
 import { useLogout } from '@/lib/use-logout'
 import { createClient } from '@/lib/supabase/client'
+import { isValidGstin } from '@/lib/indian-states'
 
 export default function GeneralSettingsPage() {
   const { t } = useTranslation()
@@ -17,6 +18,7 @@ export default function GeneralSettingsPage() {
   const updateMutation = trpc.settings.updateGeneral.useMutation()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [gstinError, setGstinError] = useState(false)
 
   const [form, setForm] = useState({
     name: '',
@@ -44,7 +46,18 @@ export default function GeneralSettingsPage() {
     e.preventDefault()
     if (!form.name) return toast.error(t('settings', 'shop_name_req'))
 
-    updateMutation.mutate(form, {
+    // GSTIN format gate (fix round 2, Stage 5b): a malformed GSTIN
+    // is never written, because it would poison the tax math on
+    // every bill. It also never blocks the rest of the form or
+    // shows a raw error: the bad value stays in the field with a
+    // calm inline note, and the previously saved GSTIN (or empty)
+    // goes up together with the other fields.
+    const gstinValue = form.gstin.trim().toUpperCase()
+    const gstinInvalid = gstinValue.length > 0 && !isValidGstin(gstinValue)
+    setGstinError(gstinInvalid)
+    const payload = { ...form, gstin: gstinInvalid ? (shop?.gstin || '') : gstinValue }
+
+    updateMutation.mutate(payload, {
       onSuccess: () => toast.success(t('settings', 'settings_updated')),
       onError: (err) => toast.error(err.message)
     })
@@ -146,8 +159,11 @@ export default function GeneralSettingsPage() {
               />
             </div>
 
-            {/* GSTIN */}
-            <div>
+            {/* GSTIN: the billing screen links here with #shop-gstin
+                when a bill's GST is being skipped for a missing
+                GSTIN, so this block carries the anchor and a scroll
+                margin for the sticky topbar. */}
+            <div className="scroll-mt-28">
               <label htmlFor="shop-gstin" className={labelClass}>
                 <FileText className="w-4 h-4" /> {t('settings', 'gstin')}
               </label>
@@ -155,10 +171,23 @@ export default function GeneralSettingsPage() {
                 id="shop-gstin"
                 type="text"
                 value={form.gstin}
-                onChange={e => setForm({...form, gstin: e.target.value?.toUpperCase()})}
+                onChange={e => {
+                  setForm({ ...form, gstin: e.target.value?.toUpperCase() })
+                  if (gstinError) setGstinError(false)
+                }}
                 placeholder="29ABCDE1234F1Z5"
                 className={inputClass}
+                aria-invalid={gstinError}
+                aria-describedby="shop-gstin-help"
               />
+              <p id="shop-gstin-help" className="text-xs text-gray-500 dark:text-[#98989D] mt-1.5">
+                {t('settings', 'gstin_help')}
+              </p>
+              {gstinError && (
+                <p role="alert" className="text-xs font-medium leading-relaxed text-[#8A5A00] dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-3 py-2 mt-2">
+                  {t('settings', 'gstin_invalid')}
+                </p>
+              )}
             </div>
 
             {/* UPI ID */}

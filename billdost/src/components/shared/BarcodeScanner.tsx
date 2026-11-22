@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Camera, Keyboard, X } from 'lucide-react'
+import { Modal } from '@/components/ui/Modal'
 
 interface Props {
   onDetected: (code: string) => void
@@ -98,8 +99,12 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Barcode scan karo">
-      <div className="w-full max-w-md bg-white dark:bg-[#1C1C1E] rounded-3xl overflow-hidden shadow-2xl">
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabel="Barcode scan karo"
+      panelClassName="max-w-[min(92vw,28rem)] bg-white dark:bg-[#1C1C1E] rounded-3xl overflow-hidden shadow-2xl"
+    >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-[#38383A]">
           <h2 className="font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
             <Camera className="w-5 h-5 text-[#1B7A4A] dark:text-[#25D366]" aria-hidden="true" />
@@ -164,7 +169,6 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

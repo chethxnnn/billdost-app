@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { MotionConfig } from 'framer-motion'
 import Sidebar from '@/components/dashboard/Sidebar'
@@ -24,13 +24,15 @@ interface Props {
 
 export default function DashboardShell({ shopId, shopName, shopCategory, shopLanguage, userEmail, userName, role, children }: Props) {
   const [collapsed, setCollapsed] = useState(false)
-  const mainRef = useRef<HTMLElement>(null)
   const pathname = usePathname()
 
-  // The main content area is the scroller (not the window), so the
-  // browser's own scroll restoration never sees it. Save each route's
-  // scroll position and restore it on back/forward navigation only, so
-  // list -> detail -> back feels like one surface (design brief).
+  // The window is the only scroller in the shell (fix round 2): the
+  // seamless rail is sticky with natural height beside a main column
+  // that grows with its content, so no inner scroll container exists
+  // for the rail to fight or overflow into. Scroll restoration is
+  // still manual: save each route's window scroll position and
+  // restore it on back/forward navigation only, so list -> detail
+  // -> back feels like one surface (design brief).
   useEffect(() => {
     const onPopState = () => sessionStorage.setItem('bd-popstate', '1')
     window.addEventListener('popstate', onPopState)
@@ -38,24 +40,22 @@ export default function DashboardShell({ shopId, shopName, shopCategory, shopLan
   }, [])
 
   useEffect(() => {
-    const el = mainRef.current
-    if (!el) return
     if (sessionStorage.getItem('bd-popstate') === '1') {
       sessionStorage.removeItem('bd-popstate')
       const y = Number(sessionStorage.getItem(`bd-main-scroll:${pathname}`) || 0)
-      if (y > 0) requestAnimationFrame(() => { el.scrollTop = y })
+      if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y))
     }
     let raf = 0
     const onScroll = () => {
       if (raf) return
       raf = requestAnimationFrame(() => {
         raf = 0
-        sessionStorage.setItem(`bd-main-scroll:${pathname}`, String(el.scrollTop))
+        sessionStorage.setItem(`bd-main-scroll:${pathname}`, String(window.scrollY))
       })
     }
-    el.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('scroll', onScroll, { passive: true })
     return () => {
-      el.removeEventListener('scroll', onScroll)
+      window.removeEventListener('scroll', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [pathname])
@@ -65,7 +65,7 @@ export default function DashboardShell({ shopId, shopName, shopCategory, shopLan
       <ShopProvider shopId={shopId} shopName={shopName} shopCategory={shopCategory} role={role}>
         <MotionConfig reducedMotion="user">
           <LanguageSync shopLanguage={shopLanguage} />
-          <div className="min-h-screen bg-gray-50 dark:bg-[#000000] flex">
+          <div className="min-h-dvh bg-gray-50 dark:bg-[#000000] flex items-start">
             {/* Sidebar (desktop only) */}
             <Sidebar
               collapsed={collapsed}
@@ -85,7 +85,7 @@ export default function DashboardShell({ shopId, shopName, shopCategory, shopLan
               />
 
               {/* Page content: only this area transitions on navigation */}
-              <main ref={mainRef} className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 overflow-y-auto">
+              <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6">
                 <PageTransition>{children}</PageTransition>
               </main>
             </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useFieldArray, UseFormReturn } from 'react-hook-form'
 import { z } from 'zod'
 import { trpc } from '@/lib/trpc/client'
@@ -77,6 +78,13 @@ export function InvoiceForm({ form }: { form: UseFormReturn<InvoiceFormValues> }
   const { data: products } = trpc.products.list.useQuery()
   const { data: shopSettings } = trpc.invoices.getShopSettings.useQuery()
 
+  // GST registration comes from the shop's saved GSTIN (Settings).
+  // computeTotals charges tax only for a registered shop: correct
+  // law, but the summary below now says so out loud instead of
+  // letting the total silently ignore the GST% the user picked.
+  const isGstRegistered = Boolean(shopSettings?.gstin)
+  const hasTaxedItem = (items || []).some((item) => (item.tax_rate || 0) > 0)
+
   // Live totals from the one money engine (same code the server runs).
   const totals = computeTotals({
     items: (items || []).map((item) => ({
@@ -94,7 +102,7 @@ export function InvoiceForm({ form }: { form: UseFormReturn<InvoiceFormValues> }
       stateCodeFromGstin(shopSettings?.gstin),
     customer_state_code: customerStateCode,
     customer_gstin: customerGstin,
-    is_gst_registered: Boolean(shopSettings?.gstin),
+    is_gst_registered: isGstRegistered,
     round_off: true,
   })
 
@@ -306,7 +314,7 @@ export function InvoiceForm({ form }: { form: UseFormReturn<InvoiceFormValues> }
 
         <div className="space-y-3">
           {fields.map((field, index) => (
-            <div key={field.id} className="p-3 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#48484A] rounded-xl relative group">
+            <div key={field.id} className="p-3 md:p-4 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#48484A] rounded-xl relative group">
               {/* Delete: always visible on touch (44px), hover-reveal on desktop.
                   It was hover-only at 24px before, so a phone user could not remove a wrong line. */}
               <button
@@ -318,68 +326,76 @@ export function InvoiceForm({ form }: { form: UseFormReturn<InvoiceFormValues> }
                 ✕
               </button>
 
-              <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-12 md:col-span-5">
+              {/* Desktop gets real column widths (fix round 2,
+                  Stage 5): the old 12-col split squeezed the item
+                  name beside its catalog picker and gave GST% a
+                  1-col slot that clipped "18%" to one letter. At md
+                  the row becomes a flex line: name flexible from
+                  240px, Qty 76, Price 120, GST 92 (full value always
+                  visible), Total 104 right-aligned. Mobile keeps the
+                  stacked 12-col grid below md. */}
+              <div className="grid grid-cols-12 gap-3 md:flex md:items-end md:gap-3">
+                <div className="col-span-12 md:flex-1 md:min-w-[240px]">
                   <label htmlFor={`item-name-${index}`} className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Item Name</label>
-                  {/* Catalog picker: full width on mobile (was squeezed to a
-                      third of the row), side by side from sm up. */}
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <select
-                      aria-label={`Item ${index + 1} catalog se chuno`}
-                      className="w-full sm:w-1/3 min-h-[44px] sm:min-h-0 px-2 py-1.5 text-xs bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg"
-                      onChange={(e) => handleItemSelect(index, e.target.value)}
-                    >
-                      <option value="">-- Catalog --</option>
-                      {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                  {/* Name first (the billing flow), catalog picker as
+                      a slim second row instead of a width thief. */}
+                  <div className="flex flex-col gap-1.5">
                     <input
                       id={`item-name-${index}`}
                       {...register(`items.${index}.name`)}
                       placeholder="Type custom item..."
-                      className="flex-1 min-h-[44px] sm:min-h-0 px-3 py-1.5 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg focus:border-[#1B7A4A] outline-none"
+                      className="w-full min-h-[44px] sm:min-h-0 px-3 py-2 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg focus:border-[#1B7A4A] outline-none"
                     />
+                    <select
+                      aria-label={`Item ${index + 1} catalog se chuno`}
+                      className="w-full h-8 px-2 text-xs bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg text-gray-500 dark:text-[#98989D]"
+                      onChange={(e) => handleItemSelect(index, e.target.value)}
+                    >
+                      <option value="">Catalog se chuno (optional)</option>
+                      {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
                   </div>
                   {errors.items?.[index]?.name && <p className="text-[10px] text-red-500 mt-1">{errors.items[index].name?.message}</p>}
                 </div>
 
-                <div className="col-span-4 md:col-span-2">
+                <div className="col-span-4 md:w-[76px] md:flex-none">
                   <label htmlFor={`item-qty-${index}`} className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Qty</label>
                   <input
                     id={`item-qty-${index}`}
                     type="number" step="any" inputMode="decimal"
                     {...register(`items.${index}.quantity`, { valueAsNumber: true })}
-                    className="w-full min-h-[44px] sm:min-h-0 px-3 py-1.5 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg text-center"
+                    className="w-full min-h-[44px] sm:min-h-0 px-3 py-2 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg text-center"
                   />
                 </div>
 
-                <div className="col-span-4 md:col-span-2">
+                <div className="col-span-4 md:w-[120px] md:flex-none">
                   <label htmlFor={`item-price-${index}`} className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Price</label>
                   <input
                     id={`item-price-${index}`}
                     type="number" step="any" inputMode="decimal"
                     {...register(`items.${index}.unit_price`, { valueAsNumber: true })}
-                    className="w-full min-h-[44px] sm:min-h-0 px-3 py-1.5 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg text-right"
+                    className="w-full min-h-[44px] sm:min-h-0 px-3 py-2 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg text-right"
                   />
                 </div>
 
                 {isJewellery && (
-                  <div className="col-span-4 md:col-span-1">
+                  <div className="col-span-4 md:w-[96px] md:flex-none">
                     <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1 whitespace-nowrap">Making (₹)</label>
                     <input
                       type="number" step="any"
                       {...register(`items.${index}.making_charge`, { valueAsNumber: true })}
-                      className="w-full px-2 py-1.5 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg text-right text-purple-600 dark:text-purple-400 font-medium"
+                      className="w-full px-2 py-2 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg text-right text-purple-600 dark:text-purple-400 font-medium"
                       placeholder="0"
                     />
                   </div>
                 )}
 
-                <div className="col-span-4 md:col-span-1">
+                <div className="col-span-4 md:w-[92px] md:flex-none">
                   <label htmlFor={`item-gst-${index}`} className="block text-[10px] uppercase font-bold text-gray-500 mb-1">GST%</label>
                   <select
                     id={`item-gst-${index}`}
                     {...register(`items.${index}.tax_rate`, { valueAsNumber: true })}
-                    className="w-full min-h-[44px] sm:min-h-0 px-1 py-1.5 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg"
+                    className="w-full min-w-[92px] min-h-[44px] sm:min-h-0 px-2 py-2 text-sm bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg"
                   >
                     {ALLOWED_TAX_RATES.map((r) => (
                       <option key={r} value={r}>{r}%</option>
@@ -387,10 +403,10 @@ export function InvoiceForm({ form }: { form: UseFormReturn<InvoiceFormValues> }
                   </select>
                 </div>
 
-                <div className={`col-span-12 flex items-end justify-end ${isJewellery ? 'md:col-span-1' : 'md:col-span-2'}`}>
+                <div className="col-span-12 md:w-[104px] md:flex-none flex items-end justify-end">
                   <div className="text-right">
                     <div className="text-[10px] text-gray-400">Total</div>
-                    <div className="font-bold text-sm">₹{totals.lines[index]?.total?.toFixed(2) || '0.00'}</div>
+                    <div className="font-bold text-sm whitespace-nowrap tabular-nums">₹{totals.lines[index]?.total?.toFixed(2) || '0.00'}</div>
                   </div>
                 </div>
               </div>
@@ -484,6 +500,59 @@ export function InvoiceForm({ form }: { form: UseFormReturn<InvoiceFormValues> }
           </div>
         </div>
 
+      </div>
+
+      {/* --- Bill Summary (fix round 2, Stage 5) ---
+          Every figure is read off the same computeTotals result the
+          page and the server use; nothing is recomputed here. The
+          tax breakup renders only for a GST-registered shop, and
+          when an unregistered shop still picks GST rates, one calm
+          line explains why the total does not move instead of
+          staying silent. */}
+      <div className="bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] p-5 rounded-2xl">
+        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-3">Bill Summary</h3>
+        <dl className="space-y-1.5 text-sm tabular-nums">
+          <div className="flex items-center justify-between">
+            <dt className="text-gray-500 dark:text-[#98989D] font-medium">Subtotal</dt>
+            <dd className="font-semibold text-gray-900 dark:text-white">₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+          </div>
+          {totals.discount_amt > 0 && (
+            <div className="flex items-center justify-between">
+              <dt className="text-gray-500 dark:text-[#98989D] font-medium">Discount</dt>
+              <dd className="font-semibold text-[#1B7A4A] dark:text-[#25D366]">-₹{totals.discount_amt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+            </div>
+          )}
+          {isGstRegistered && totals.is_interstate && (
+            <div className="flex items-center justify-between">
+              <dt className="text-gray-500 dark:text-[#98989D] font-medium">IGST</dt>
+              <dd className="font-semibold text-gray-900 dark:text-white">₹{totals.igst_amt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+            </div>
+          )}
+          {isGstRegistered && !totals.is_interstate && (
+            <>
+              <div className="flex items-center justify-between">
+                <dt className="text-gray-500 dark:text-[#98989D] font-medium">CGST</dt>
+                <dd className="font-semibold text-gray-900 dark:text-white">₹{totals.cgst_amt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-gray-500 dark:text-[#98989D] font-medium">SGST</dt>
+                <dd className="font-semibold text-gray-900 dark:text-white">₹{totals.sgst_amt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+              </div>
+            </>
+          )}
+          <div className="flex items-center justify-between border-t border-gray-100 dark:border-[#38383A] pt-2.5 mt-1">
+            <dt className="font-bold text-gray-900 dark:text-white">Total</dt>
+            <dd className="font-black text-base text-gray-900 dark:text-white">₹{totals.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+          </div>
+        </dl>
+        {!isGstRegistered && hasTaxedItem && (
+          <p className="text-xs font-medium leading-relaxed text-[#8A5A00] dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-3 py-2 mt-3">
+            GST total mein nahi juda hai kyunki shop ka GSTIN Settings mein nahi hai.{' '}
+            <Link href="/settings#shop-gstin" className="font-bold text-[#1B7A4A] dark:text-[#25D366] underline underline-offset-2">
+              GSTIN add karo
+            </Link>
+          </p>
+        )}
       </div>
 
     </div>
